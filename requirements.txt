@@ -1,0 +1,15 @@
+# Jupyter runtime
+ipykernel==7.2.0
+jupyter==1.1.1
+
+# Data processing
+numpy==2.4.4
+pandas==3.0.2
+scipy==1.17.1
+PyWavelets==1.9.0
+
+# Visualization
+matplotlib==3.10.8
+
+# Serial communication (CSI collector)
+pyserial==3.5
