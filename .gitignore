@@ -216,3 +216,23 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+# CSI data
+*/data/*.csv
+*/data/*.json
+
+# Plot outputs
+*/outputs/*.png
+*/outputs/*.jpg
+*/outputs/*.jpeg
+*/outputs/*.svg
+*/outputs/*.pdf
+
+# Trained models
+*.pkl
+*.joblib
+
+# OS generated files
+.DS_Store
+Thumbs.db
