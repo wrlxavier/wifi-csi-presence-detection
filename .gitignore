@@ -221,6 +221,9 @@ __marimo__/
 # CSI data
 */data/*.csv
 */data/*.json
+*/outputs/*/*.csv
+*/outputs/*/*.json
+*/outputs/*/*.parquet
 
 # Plot outputs
 */outputs/*.png
@@ -228,6 +231,7 @@ __marimo__/
 */outputs/*.jpeg
 */outputs/*.svg
 */outputs/*.pdf
+*/outputs/*/figures/*.png
 
 # Trained models
 *.pkl
