@@ -232,6 +232,7 @@ __marimo__/
 */outputs/*.svg
 */outputs/*.pdf
 */outputs/*/figures/*.png
+*/outputs/figures/*
 
 # Trained models
 *.pkl
