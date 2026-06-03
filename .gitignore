@@ -218,25 +218,23 @@ __marimo__/
 .streamlit/secrets.toml
 
 
-# CSI data
-*/data/*.csv
-*/data/*.json
-*/outputs/*/*.csv
-*/outputs/*/*.json
-*/outputs/*/*.parquet
+# Raw session data
+data/**/*.csv
+data/**/*.json
 
-# Plot outputs
-*/outputs/*.png
-*/outputs/*.jpg
-*/outputs/*.jpeg
-*/outputs/*.svg
-*/outputs/*.pdf
-*/outputs/*/figures/*.png
-*/outputs/figures/*
+# Generated artifacts
+outputs/**/*.csv
+outputs/**/*.parquet
+outputs/**/*.json
+outputs/**/*.png
+outputs/**/*.jpg
+outputs/**/*.jpeg
+outputs/**/*.svg
+outputs/**/*.pdf
 
 # Trained models
-*.pkl
-*.joblib
+models/*.pkl
+models/*.joblib
 
 # OS generated files
 .DS_Store
