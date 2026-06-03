@@ -41,12 +41,28 @@ Pipeline v0 output (`pilot/outputs/pipeline_v0/`):
 ## Repository Structure
 
 ```
-csi_collector_v2.ipynb                          # Data collection helper
-csi_data_pipeline_v0_parsing_features_metrics.ipynb  # Pipeline v0
-first_test/                                     # Initial April 2026 test (2 sessions)
-pilot/
-  data/                                         # 6 raw sessions (CSV + JSON metadata)
-  outputs/pipeline_v0/                          # features_v0_ht40.csv/.parquet + report
+data/
+  first_test/          # Initial April 2026 test (2 raw sessions)
+  pilot/               # Pilot May 2026 (6 raw sessions — C, D, E, F valid)
+  main/                # Main dataset (Card 6 — future collection)
+notebooks/
+  00_acquisition/      # csi_collector_v2.ipynb — data collection helper
+  01_eda/              # eda_first_test.ipynb, eda_pilot.ipynb
+  02_pipeline/         # pipeline_v0.ipynb — parsing → features → report
+  03_analysis/         # separability_figures.ipynb, separability_lda.ipynb
+  04_modeling/         # ML classifiers (Random Forest, SVM, XGBoost, MLP) — Card 7
+src/
+  parsing.py           # CSV/JSON parsing, subcarrier extraction
+  preprocessing.py     # I/Q → amplitude, filtering, windowing
+  features.py          # variance, MAD, range, IQR per window
+outputs/
+  pilot/pipeline_v0/   # features_v0_ht40.csv/.parquet + pipeline_report_v0.json
+  pilot/figures/       # final_figure.pdf + LDA/PCA separation plots
+models/                # Serialised trained models (.pkl / .joblib) — Card 7
+docs/
+  REPO_STRUCTURE_PROPOSAL.md
+  artigo_SBrT.md
+  trello_board.md
 ```
 
 ## Hardware
