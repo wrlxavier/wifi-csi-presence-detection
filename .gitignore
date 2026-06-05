@@ -222,6 +222,9 @@ __marimo__/
 data/**/*.csv
 data/**/*.json
 
+# parquet files from data processing
+data/**/*.parquet
+
 # Generated artifacts
 outputs/**/*.csv
 outputs/**/*.parquet
