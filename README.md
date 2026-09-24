@@ -21,12 +21,12 @@ The goal is to build a **device-free presence detection system** that leverages 
 
 | Stage | Status | Metric / Output |
 |---|---|---|
-| Hardware setup & data collection | Done | ESP32-S3 HT40 link, 13 sessions (pilot + main) |
-| Signal processing & mask | Done | 162 shared valid HT40 subcarriers |
-| Feature dataset assembly | Done | 3,889 windows $\times$ 648 statistical features |
-| ML model training (10-fold CV) | Done | MLP (0.9922), GB (0.9789), SVM (0.9748), RF (0.9721) |
-| Held-out test set evaluation | Done | $F_1 = 0.9897$, Accuracy = 98.97%, FAR = 0.32% |
-| Robustness & thesis reporting | Done | LaTeX tables & publication figures in `reports/` |
+| Hardware setup & data collection | Done | ESP32-S3 HT40 link, 15 recorded sessions across 3 campaigns (11 valid ingested: C–M) |
+| Signal processing & mask | Done | 162 shared valid HT40 subcarriers (out of 192 raw subcarriers) |
+| Feature dataset assembly | Done | 3,889 windows $\times$ 648 statistical features (2,095 empty, 1,794 occupied) |
+| ML model training (10-fold CV) | Done | MLP (0.9922), GB (0.9789), SVM (0.9748), RF (0.9721) Macro $F_1$ |
+| Held-out test set evaluation | Done | Best model (MLP): $F_1 = 0.9897$, Accuracy = 98.97%, FAR = 0.32% (584 test windows) |
+| Robustness & thesis reporting | Done | LaTeX tables & publication figures in `reports/` (per-session, condition, time-of-day) |
 
 ## Repository Structure
 
@@ -45,23 +45,28 @@ wifi-csi-presence-detection/
 │   │   └── main/                       # Main campaign (sessions G–M)
 │   ├── 02_interim/                     # Calibrated amplitude arrays & masks
 │   └── 03_processed/                   # Canonical feature datasets & splits
-│       ├── features_ht40.parquet       # Canonical tabular feature dataset
-│       └── splits/                     # train.parquet, val.parquet, test.parquet
-├── docs/                               # Project documentation & architecture proposals
-│   └── REPO_STRUCTURE_PROPOSAL.md      # Detailed repository architecture & migration guide
+│       ├── features_ht40.parquet       # Canonical tabular feature dataset (Parquet)
+│       ├── features_ht40.csv           # Canonical tabular feature dataset (CSV)
+│       ├── valid_subcarrier_mapping.csv # Retained subcarrier indices mapping
+│       └── splits/                     # train.parquet, val.parquet, test.parquet (70/15/15)
+├── docs/                               # Project documentation
 ├── models/                             # Trained models & registry
-│   ├── registry/                       # Atomic Pipeline(Scaler+Classifier) + model_card.json
-│   ├── gradient_boosting.pkl           # Legacy flat pickles for backward compatibility
+│   ├── registry/                       # Bundled pipelines (pipeline.joblib + model_card.json)
+│   │   ├── mlp_bundle/                 # Multilayer Perceptron bundle (best model)
+│   │   ├── svm_bundle/                 # Support Vector Machine bundle
+│   │   ├── gradient_boosting_bundle/   # Gradient Boosting bundle
+│   │   └── random_forest_bundle/       # Random Forest bundle
+│   ├── gradient_boosting.pkl           # Standalone model pickles
 │   ├── mlp.pkl
 │   ├── random_forest.pkl
 │   ├── svm.pkl
-│   └── scaler.pkl
+│   └── scaler.pkl                      # Fitted StandardScaler
 ├── notebooks/                          # Narrative exploration & visualization (read-only)
 │   ├── 00_acquisition/                 # csi_collector_v2.ipynb
-│   ├── 01_eda/                         # eda_pilot.ipynb, eda_main.ipynb
-│   ├── 02_pipeline/                    # pipeline_v1.ipynb
+│   ├── 01_eda/                         # eda_first_test.ipynb, eda_pilot.ipynb, eda_main.ipynb
+│   ├── 02_pipeline/                    # pipeline_v0.ipynb, pipeline_v1.ipynb
 │   ├── 03_analysis/                    # separability_figures.ipynb, separability_lda.ipynb
-│   └── 04_modeling/                    # 01_split to 05_robustness
+│   └── 04_modeling/                    # 01_split.ipynb to 05_robustness.ipynb
 ├── reports/                            # Publication & thesis assets
 │   ├── figures/                        # High-resolution PNG and vector PDF plots
 │   ├── tables/                         # LaTeX (.tex) and CSV tables for thesis
@@ -100,6 +105,7 @@ Install the project in editable mode with development dependencies:
 ```bash
 make install
 # or directly: uv pip install -e ".[dev]"
+# or sync environment: uv sync --extra dev
 ```
 
 ### 2. Run Tests
@@ -115,22 +121,39 @@ Run data processing, training, evaluation, and report generation with one comman
 make all
 ```
 
-Or execute individual pipeline stages:
+Or execute individual pipeline stages (via `make` or directly with `uv run`):
 ```bash
-make pipeline    # Process raw data into features_ht40.parquet and splits
-make train       # Run 10-fold CV and register models
-make evaluate    # Evaluate held-out test set and compute robustness metrics
-make figures     # Export publication figures and LaTeX tables to reports/
+# 1. Process raw data into features_ht40.parquet, mapping, and splits
+make pipeline
+# or: uv run python scripts/run_pipeline.py --config configs/pipeline.yaml
+
+# 2. Run 10-fold CV hyperparameter search and register models
+make train
+# or: uv run python scripts/train_models.py --config configs/models.yaml
+
+# 3. Evaluate held-out test set and compute multi-axis robustness benchmarks
+make evaluate
+# or: uv run python scripts/evaluate.py --config configs/models.yaml
+
+# 4. Export publication figures and LaTeX tables to reports/
+make figures
+# or: uv run python scripts/export_thesis_assets.py --output reports/
+```
+
+### 4. Real-Time CSI Acquisition (Optional)
+To record new CSI sessions over serial from the ESP32-S3 RX node:
+```bash
+uv run python scripts/collect_csi.py --label empty --session-id N --port /dev/ttyACM0 --duration 690
 ```
 
 ## Hardware
 
 | Component | Qty | Role |
 |---|---|---|
-| ESP32-S3-DevKitC-1U-N8R8 | 2 | TX (STA) and RX (AP) nodes |
-| 2.4 GHz Wi-Fi antenna (3 dBi, U.FL) | 2 | External antennas |
-| Aluminum tripod (2.1 m) | 2 | Fixed positioning |
-| Power bank 10,000 mAh | 1 | Portable TX power supply |
+| ESP32-S3-DevKitC-1U-N8R8 | 2 | TX (STA transmitter) and RX (AP CSI receiver) nodes |
+| 2.4 GHz Wi-Fi antenna (3 dBi, U.FL) | 2 | External omnidirectional antennas |
+| Aluminum tripod (2.1 m max height) | 2 | Fixed positioning at 1.20 m height, 2.0 m LoS distance |
+| Power bank 10,000 mAh | 1 | Portable battery for isolated TX node power supply |
 
 ## References
 
