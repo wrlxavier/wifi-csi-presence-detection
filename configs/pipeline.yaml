@@ -1,0 +1,47 @@
+project:
+  name: "wifi-csi-presence-detection"
+  seed: 42
+
+paths:
+  raw_dir: "data/01_raw"
+  interim_dir: "data/02_interim"
+  processed_dir: "data/03_processed"
+  reports_dir: "reports"
+
+acquisition:
+  expected_raw_values: 384
+  n_complex_subcarriers: 192
+  nominal_rate_hz: 29.0
+
+preprocessing:
+  required_metadata_status: "VALID"
+  subcarrier_mean_amp_threshold: 0.5
+  min_shared_valid_subcarriers: 40
+  min_absolute_samples_per_window: 5
+  min_window_sample_rate_fraction: 0.5
+  filter_type: "none" # options: "none", "butterworth", "wavelet"
+  butterworth_order: 3
+  butterworth_cutoff_hz: 3.0
+  wavelet_name: "db4"
+  wavelet_level: null
+  window_seconds: 2.0
+  active_interval_fallback: "full"
+  fallback_trim_seconds: 0.0
+
+features:
+  descriptors: ["var", "mad", "range", "iqr"]
+
+splits:
+  val_size: 0.15
+  test_size: 0.15
+  random_seed: 42
+  strategy: "stratified" # options: "stratified", "loso"
+
+label_map:
+  empty: 0
+  occupied_still: 1
+  occupied_moving: 1
+  occupied_p1_still: 1
+  occupied_p2_still: 1
+  occupied_p3_still: 1
+  occupied_p4_still: 1

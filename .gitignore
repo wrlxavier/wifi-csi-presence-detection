@@ -218,14 +218,20 @@ __marimo__/
 .streamlit/secrets.toml
 
 
-# Raw session data
+# Raw session data and tiered data
 data/**/*.csv
 data/**/*.json
-
-# parquet files from data processing
 data/**/*.parquet
 
-# Generated artifacts
+# Reports and generated figures
+reports/figures/**/*.png
+reports/figures/**/*.pdf
+reports/tables/**/*.tex
+reports/tables/**/*.csv
+reports/logs/**/*.json
+reports/logs/**/*.csv
+
+# Generated artifacts (legacy outputs)
 outputs/**/*.csv
 outputs/**/*.parquet
 outputs/**/*.json
@@ -235,9 +241,10 @@ outputs/**/*.jpeg
 outputs/**/*.svg
 outputs/**/*.pdf
 
-# Trained models
+# Trained models and registry
 models/*.pkl
 models/*.joblib
+models/registry/**/*.joblib
 
 # OS generated files
 .DS_Store
