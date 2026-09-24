@@ -35,9 +35,7 @@ wifi-csi-presence-detection/
 ├── Makefile                            # Reproducible automation targets (uv run)
 ├── pyproject.toml                      # PEP 621 dependencies & package specification
 ├── configs/                            # Centralized YAML configurations
-│   ├── acquisition.yaml                # Serial port, baudrate, timeouts
-│   ├── pipeline.yaml                   # Windowing, filtering, and split parameters
-│   └── models.yaml                     # Search spaces, CV folds, scoring metrics
+│   └── pipeline.yaml                   # Windowing, filtering, and feature parameters
 ├── data/                               # 3-Tier Unidirectional Data Storage
 │   ├── 01_raw/                         # Immutable raw acquisition dumps
 │   │   ├── first_test/                 # Exploratory benchmark campaign
@@ -61,22 +59,18 @@ wifi-csi-presence-detection/
 │   ├── random_forest.pkl
 │   ├── svm.pkl
 │   └── scaler.pkl                      # Fitted StandardScaler
-├── notebooks/                          # Narrative exploration & visualization (read-only)
-│   ├── 00_acquisition/                 # csi_collector_v2.ipynb
+├── notebooks/                          # Interactive pipeline workflow notebooks
+│   ├── 00_acquisition/                 # csi_collector_v2.ipynb (data collection)
 │   ├── 01_eda/                         # eda_first_test.ipynb, eda_pilot.ipynb, eda_main.ipynb
-│   ├── 02_pipeline/                    # pipeline_v0.ipynb, pipeline_v1.ipynb
+│   ├── 02_pipeline/                    # pipeline_v0.ipynb, pipeline_v1.ipynb (features & filtering)
 │   ├── 03_analysis/                    # separability_figures.ipynb, separability_lda.ipynb
-│   └── 04_modeling/                    # 01_split.ipynb to 05_robustness.ipynb
+│   └── 04_modeling/                    # 01_split.ipynb to 05_robustness.ipynb (training & evaluation)
 ├── reports/                            # Publication & thesis assets
 │   ├── figures/                        # High-resolution PNG and vector PDF plots
 │   ├── tables/                         # LaTeX (.tex) and CSV tables for thesis
 │   └── logs/                           # Automated pipeline & evaluation JSON logs
-├── scripts/                            # Headless CLI automation entry points
-│   ├── collect_csi.py                  # Standalone serial acquisition daemon
-│   ├── run_pipeline.py                 # Raw -> Interim -> Features -> Splits
-│   ├── train_models.py                 # Model training & CV grid search
-│   ├── evaluate.py                     # Held-out test set & robustness benchmarks
-│   └── export_thesis_assets.py         # Generate LaTeX tables & vector figures
+├── scripts/                            # Real-time live inference tools
+│   └── realtime_presence.py            # Live real-time CSI presence detection monitor
 ├── src/                                # Installable Python package (uv pip install -e .)
 │   ├── wifi_csi/                       # Core modular package
 │   │   ├── core/                       # Config loader and domain constants
@@ -115,35 +109,24 @@ make test
 # or directly: uv run pytest tests/ -v
 ```
 
-### 3. Execute End-to-End Pipeline
-Run data processing, training, evaluation, and report generation with one command:
+### 3. Pipeline Workflow (Jupyter Notebooks)
+
+The entire workflow—including data acquisition, preprocessing, training, and validation—is executed using interactive Jupyter Notebooks in the `notebooks/` directory:
+
+1. **Acquisition:** [`notebooks/00_acquisition/csi_collector_v2.ipynb`](notebooks/00_acquisition/csi_collector_v2.ipynb)
+2. **Preprocessing & Feature Extraction:** [`notebooks/02_pipeline/pipeline_v1.ipynb`](notebooks/02_pipeline/pipeline_v1.ipynb)
+3. **Dataset Splitting:** [`notebooks/04_modeling/01_split.ipynb`](notebooks/04_modeling/01_split.ipynb)
+4. **Data Normalization & Preprocessing:** [`notebooks/04_modeling/02_preprocessing.ipynb`](notebooks/04_modeling/02_preprocessing.ipynb)
+5. **Model Training (10-fold CV):** [`notebooks/04_modeling/03_training.ipynb`](notebooks/04_modeling/03_training.ipynb)
+6. **Validation & Evaluation:** [`notebooks/04_modeling/04_evaluation.ipynb`](notebooks/04_modeling/04_evaluation.ipynb)
+7. **Robustness & Thesis Reporting:** [`notebooks/04_modeling/05_robustness.ipynb`](notebooks/04_modeling/05_robustness.ipynb)
+
+### 4. Real-Time Live Presence Detection
+
+To launch the live system monitoring and presence detection interface with the ESP32-S3 RX node:
 ```bash
-make all
-```
-
-Or execute individual pipeline stages (via `make` or directly with `uv run`):
-```bash
-# 1. Process raw data into features_ht40.parquet, mapping, and splits
-make pipeline
-# or: uv run python scripts/run_pipeline.py --config configs/pipeline.yaml
-
-# 2. Run 10-fold CV hyperparameter search and register models
-make train
-# or: uv run python scripts/train_models.py --config configs/models.yaml
-
-# 3. Evaluate held-out test set and compute multi-axis robustness benchmarks
-make evaluate
-# or: uv run python scripts/evaluate.py --config configs/models.yaml
-
-# 4. Export publication figures and LaTeX tables to reports/
-make figures
-# or: uv run python scripts/export_thesis_assets.py --output reports/
-```
-
-### 4. Real-Time CSI Acquisition (Optional)
-To record new CSI sessions over serial from the ESP32-S3 RX node:
-```bash
-uv run python scripts/collect_csi.py --label empty --session-id N --port /dev/ttyACM0 --duration 690
+make live
+# or directly: uv run python scripts/realtime_presence.py
 ```
 
 ## Hardware

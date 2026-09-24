@@ -212,7 +212,8 @@ class RealtimeCSIInference:
         mapping_file = next((f for f in candidates if f.exists()), None)
         if mapping_file:
             df = pd.read_csv(mapping_file)
-            raw_indices = df["raw_complex_subcarrier_index"].to_numpy(dtype=int)
+            col = "raw_complex_subcarrier_index" if "raw_complex_subcarrier_index" in df.columns else "raw_subcarrier_index"
+            raw_indices = df[col].to_numpy(dtype=int)
         else:
             # Fallback to feature columns count from model card
             feat_cols = self.model_card.get("metadata", {}).get("feature_columns", [])
