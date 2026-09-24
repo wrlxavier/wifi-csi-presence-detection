@@ -76,9 +76,11 @@ To evaluate which subcarriers and statistical descriptors provide the highest di
 
 $$F = \frac{\text{Between-class variance}}{\text{Within-class variance}} = \frac{\text{MSB}}{\text{MSW}}$$
 
-### Key Findings from ANOVA Heatmaps
+### Key Findings from ANOVA Tests
 
-1. **Top Feature Descriptor**: Mean Absolute Deviation (`mad`) and Variance (`var`) achieved the highest overall F-statistics ($F > 500$ on sensitive subcarriers), outperforming Dynamic Range.
+1. **Top Feature Descriptors**:
+   - **Binary Presence**: F-statistics ranged from $0.0$ to $377.1$ (median: $169.3$). Mean Absolute Deviation (`mad`) and Interquartile Range (`iqr`) achieved the highest overall discriminative scores (e.g. `sc150_mad` with $F = 377.1$, `sc150_iqr` with $F = 375.4$, and `sc150_var` with $F = 289.4$), substantially outperforming Dynamic Range.
+   - **3-Class Activity Level**: F-statistics ranged from $137.8$ to $2,253.5$ (median: $1,259.5$), routinely exceeding $F > 500$ across sensitive subcarriers due to large variance swings between motionless standing and dynamic walking.
 2. **Frequency-Selective Sensitivity**:
    - Subcarriers situated adjacent to deep multipath fading notches exhibit the largest relative amplitude swings when human tissue reflects or scatters energy into that notch.
    - Band edge subcarriers (near lower and upper HT40 limits) demonstrated heightened sensitivity to multipath changes.
@@ -98,3 +100,6 @@ The analysis notebooks exported publication-grade figures utilizing color-blind 
 | `sep_02_lda.png` | [separability_lda.ipynb](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/03_analysis/separability_lda.ipynb) | 1D binary LDA histogram and 2D three-class projection scatter |
 | `sep_03_feature_distributions.png` | [separability_lda.ipynb](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/03_analysis/separability_lda.ipynb) | Violin plots of mean subcarrier variance, MAD, range, and IQR |
 | `sep_04_discriminability_heatmap.png` | [separability_lda.ipynb](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/03_analysis/separability_lda.ipynb) | Per-subcarrier ANOVA F-statistic heatmap across all 4 feature types |
+| `sep_04b_discriminability_profile.png` | [separability_lda.ipynb](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/03_analysis/separability_lda.ipynb) | Line profiles of ANOVA F-statistics across OFDM subcarriers |
+| `sep_05_pairplot.png` | [separability_lda.ipynb](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/03_analysis/separability_lda.ipynb) | Pairwise feature interaction plot across 3 presence conditions |
+| `sep_06_top_features.png` | [separability_lda.ipynb](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/03_analysis/separability_lda.ipynb) | Violin distributions for top 3 subcarriers per feature type |

@@ -6,13 +6,13 @@ This document details the signal processing pipeline, OFDM subcarrier masking, t
 
 ## 1. Physical Layer I/Q Decomposition
 
-Each ESP32-S3 packet contains raw channel measurements formatted as interleaved In-phase ($I$) and Quadrature ($Q$) signed 8-bit integers:
+Each ESP32-S3 packet contains raw channel measurements formatted as interleaved Quadrature ($Q$, imaginary) and In-phase ($I$, real) signed 8-bit integers per the ESP-IDF CSI hardware buffer format:
 
-$$\text{CSI\_RAW} = [I_0, Q_0, I_1, Q_1, \dots, I_{N-1}, Q_{N-1}]$$
+$$\text{CSI\_RAW} = [Q_0, I_0, Q_1, I_1, \dots, Q_{N-1}, I_{N-1}] = [\text{imag}_0, \text{real}_0, \dots]$$
 
 For 802.11n HT40 (40 MHz channel bandwidth), the total payload length is 384 bytes, representing $N = 192$ complex subcarrier values:
 
-$$H_k = I_k + j \cdot Q_k, \quad k \in \{0, 1, \dots, 191\}$$
+$$H_k = I_k + j \cdot Q_k, \quad \text{where } I_k = \text{CSI\_RAW}[2k+1], \; Q_k = \text{CSI\_RAW}[2k], \quad k \in \{0, 1, \dots, 191\}$$
 
 From the complex channel frequency response $H_k$, the instantaneous subcarrier amplitude $A_k$ is computed as the Euclidean norm:
 
@@ -59,7 +59,7 @@ This isolates pure physical states:
 - Zero operator movement during empty sessions.
 - Stable, continuous human posture during occupied sessions.
 
-The loader incorporates automated date-rollover logic to correctly handle sessions where $t_2$ extends past 00:00:00 UTC.
+The metadata parsing module [`wifi_csi.parsing.metadata_parser`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/metadata_parser.py#L61-L73) incorporates automated date-rollover logic to correctly handle sessions where $t_2$ extends past 00:00:00 UTC.
 
 ---
 

@@ -10,7 +10,7 @@
 
 ## 1. Executive Summary & Architectural Vision
 
-This project demonstrates a fully functional, device-free human presence detection system leveraging Channel State Information (CSI) from Wi-Fi 802.11n signals collected by two low-cost ESP32-S3 nodes. By monitoring variations in multipath propagation across 192 OFDM subcarriers (162 shared valid HT40 subcarriers), the system extracts statistical time-domain features over sliding windows and achieves high binary classification accuracy ($F_1 > 0.99$ on held-out test data) across multiple machine learning models (Gradient Boosting, SVM, Random Forest, MLP).
+This project demonstrates a fully functional, device-free human presence detection system leveraging Channel State Information (CSI) from Wi-Fi 802.11n signals collected by two low-cost ESP32-S3 nodes. By monitoring variations in multipath propagation across 192 OFDM subcarriers (162 shared valid HT40 subcarriers), the system extracts statistical time-domain features over sliding windows and achieves high binary classification accuracy ($F_1 = 0.9897$ on held-out test data) across multiple machine learning models (Gradient Boosting, SVM, Random Forest, MLP).
 
 While the underlying engineering and signal processing pipeline are technically sound, the repository has evolved organically across multiple experimental campaigns (`first_test`, `pilot`, `main`), leading to structural entropy. 
 
@@ -119,10 +119,13 @@ wifi-csi-presence-detection/
 │           └── split_metadata.json     # Splitting parameters, random seed, session mapping
 │
 ├── docs/                               # Project documentation & academic notes
-│   ├── REPO_STRUCTURE_PROPOSAL.md      # This architectural specification
-│   ├── hardware_setup.md               # Node mounting, antenna specs, room coordinates
-│   ├── data_dictionary.md              # CSI packet fields, sidecar JSON schema, feature definitions
-│   └── thesis_notes.md                 # UFMG PFC guidelines, SBrT paper draft notes
+│   ├── INDEX.md                        # Documentation suite master index
+│   ├── HARDWARE_AND_ACQUISITION.md     # Node mounting, antenna specs, room coordinates, protocol
+│   ├── DATASET_AND_SESSIONS.md         # Campaign inventory, spatial topologies, quality criteria
+│   ├── SIGNAL_PROCESSING_AND_FEATURES.md # I/Q decoding, subcarrier masks, 648 statistical features
+│   ├── STATISTICAL_ANALYSIS_AND_SEPARABILITY.md # PCA, LDA, and ANOVA statistical separability
+│   ├── MODELING_AND_BENCHMARKS.md      # 10-fold CV, held-out evaluation, 4-axis robustness
+│   └── REPO_STRUCTURE_PROPOSAL.md      # Repository architecture specification
 │
 ├── models/                             # Trained models, pipelines, and registries
 │   ├── registry/                       # Versioned model artifacts with metadata
@@ -211,12 +214,11 @@ wifi-csi-presence-detection/
     ├── unit/
     │   ├── test_csi_decoder.py         # Verify I/Q string to complex array parsing
     │   ├── test_signal_filters.py      # Butterworth, masking, and amplitude calculations
-    │   ├── test_feature_extractor.py   # Verify variance, MAD, IQR, and column naming
+    │   ├── test_features.py            # Verify variance, MAD, IQR, and column naming
     │   ├── test_pipeline_builder.py    # Verify Scikit-Learn Pipeline bundling
     │   └── test_metrics.py             # Verify FAR, F1, and accuracy computations
     └── integration/
-        ├── test_data_pipeline.py       # End-to-end: raw synthetic CSV -> features.parquet
-        └── test_model_inference.py     # End-to-end: raw window -> pipeline.predict()
+        └── test_pipeline_e2e.py        # End-to-end: raw synthetic CSV -> features -> training -> inference
 ```
 
 ---

@@ -32,34 +32,34 @@ Four model families were tuned using `GridSearchCV` with 10-fold stratified cros
 
 ### Hyperparameter Search Space
 
+The canonical parameter grids defined in [`configs/models.yaml`](file:///home/xavier/dev/wifi-csi-presence-detection/configs/models.yaml) and evaluated via `GridSearchCV`:
+
 1. **Random Forest Classifier**:
-   - `n_estimators`: `[100, 200]`
-   - `max_depth`: `[10, 20, None]`
-   - `class_weight`: `'balanced'`
-2. **Support Vector Machine (SVM-RBF)**:
+   - `n_estimators`: `[50, 100, 200]`
+   - `max_depth`: `[None, 10, 20]`
+2. **Support Vector Machine (SVM)**:
    - `C`: `[0.1, 1.0, 10.0]`
-   - `kernel`: `'rbf'`
-   - `gamma`: `['scale', 0.01, 0.001]`
+   - `kernel`: `['rbf', 'linear']`
 3. **Gradient Boosting Classifier**:
-   - `n_estimators`: `[100, 200]`
+   - `n_estimators`: `[50, 100]`
    - `learning_rate`: `[0.05, 0.1]`
    - `max_depth`: `[3, 5]`
 4. **Multilayer Perceptron (MLP)**:
-   - `hidden_layer_sizes`: `[(50, 50), (128, 64)]`
-   - `activation`: `'relu'`
-   - `alpha`: `0.0001`
-   - `max_iter`: `500`
+   - `hidden_layer_sizes`: `[[50], [100], [50, 50]]`
+   - `max_iter`: `[500]`
 
 ### Cross-Validation Results
+
+The 10-fold cross-validation results from the canonical automated training pipeline ([`reports/logs/cv_results.csv`](file:///home/xavier/dev/wifi-csi-presence-detection/reports/logs/cv_results.csv)) are summarized below:
 
 | Model Architecture | 10-Fold CV Macro F1 | Optimal Hyperparameters |
 |---|---|---|
 | Multilayer Perceptron (MLP) | **0.9922** | `hidden_layer_sizes: [50, 50], max_iter: 500` |
-| Support Vector Machine (SVM) | **0.9748** - **0.9926** | `C: 10.0, kernel: 'rbf', gamma: 'scale'` |
-| Gradient Boosting | **0.9789** - **0.9849** | `learning_rate: 0.1, max_depth: 3, n_estimators: 100` |
-| Random Forest | **0.9721** - **0.9730** | `max_depth: 20, n_estimators: 100` |
+| Gradient Boosting | **0.9789** | `learning_rate: 0.1, max_depth: 3, n_estimators: 100` |
+| Support Vector Machine (SVM) | **0.9748** | `C: 10.0, kernel: 'rbf'` |
+| Random Forest | **0.9721** | `max_depth: 20, n_estimators: 100` |
 
-All four architectures achieved exceptional cross-validation performance, with CV Macro F1 scores consistently exceeding 0.97.
+All four architectures achieved exceptional cross-validation performance, with CV Macro F1 scores consistently exceeding 0.97. (In exploratory notebook grid searches exploring larger parameter spaces, scores ranged up to 0.9926 for SVM and 0.9849 for Gradient Boosting).
 
 ---
 
@@ -71,20 +71,20 @@ Models were evaluated on the 583 validation samples to select the final deployme
 
 | Model | Accuracy | Macro F1 | Precision | Recall | False Alarm Rate (FAR) |
 |---|---|---|---|---|---|
-| Multilayer Perceptron (MLP) | **99.49%** | **0.9948** | 0.9950 | 0.9947 | **0.00%** |
+| Multilayer Perceptron (MLP) | **99.49%** | **0.9948** | 0.9953 | 0.9944 | **0.00%** |
 | Support Vector Machine (SVM) | 98.11% | 0.9810 | 0.9806 | 0.9814 | 1.59% |
 | Gradient Boosting | 98.11% | 0.9810 | 0.9812 | 0.9810 | 0.64% |
 | Random Forest | 98.11% | 0.9810 | 0.9814 | 0.9807 | 0.32% |
 
 ### Single-Evaluation on Held-Out Test Set
 
-The top model was evaluated once on the 584 held-out test samples:
+The top model (MLP) was evaluated once on the 584 held-out test samples:
 
 - **Accuracy**: **98.97%**
 - **Macro F1 Score**: **0.9897**
-- **Precision**: 0.9902
-- **Recall**: 0.9893
-- **False Alarm Rate (FAR)**: **0.32%**
+- **Precision**: 0.9903
+- **Recall**: 0.9891
+- **False Alarm Rate (FAR)**: **0.32%** (1 false positive out of 315 empty windows)
 - **Project Target**: Macro F1 $\ge 0.90$
 - **Verdict**: **PASSED** (Margin: +0.0897 above target)
 
@@ -114,27 +114,26 @@ To verify whether the system overfits to specific physical conditions or subject
 
 ### Axis 2: Posture and Spatial Position Robustness
 
-| Condition / Position | Description | Accuracy | Macro F1 | FAR |
-|---|---|---|---|---|
-| `empty` | All empty baseline sessions | **100.00%** | 1.0000 | 0.00% |
-| `occupied_moving` | Dynamic continuous movement | **100.00%** | 1.0000 | 0.00% |
-| `occupied_still` | Generic pilot static sitting | **100.00%** | 1.0000 | 0.00% |
-| `occupied_p2_still` | On-LoS near transmitter (P2) | **100.00%** | 1.0000 | 0.00% |
-| `occupied_p3_still` | On-LoS near receiver (P3) | **100.00%** | 1.0000 | 0.00% |
-| `occupied_p4_still` | Off-LoS East (P4) | **100.00%** | 1.0000 | 0.00% |
-| `occupied_p1_still` | Off-LoS West (P1) | 92.00% - 93.18% | 0.4824 | 0.00% |
+| Condition / Position | Description | Test Samples (n) | Accuracy | Macro F1 | False Alarm Rate |
+|---|---|---|---|---|---|
+| `empty` | All empty baseline sessions (C, F, G, J, L) | 315 | **99.68%** | 0.4992 | 0.32% |
+| `occupied_moving` | Dynamic continuous movement (Session E) | 48 | **100.00%** | **1.0000** | 0.00% |
+| `occupied_still` | Generic pilot standing motionless (Session D) | 31 | **100.00%** | **1.0000** | 0.00% |
+| `occupied_p2_still` | On-LoS near transmitter (P2 - Session I) | 46 | **100.00%** | **1.0000** | 0.00% |
+| `occupied_p3_still` | On-LoS near receiver (P3 - Session K) | 48 | **100.00%** | **1.0000** | 0.00% |
+| `occupied_p4_still` | Off-LoS East (P4 - Session M) | 46 | **97.83%** | 0.4945 | 0.00% |
+| `occupied_p1_still` | Off-LoS West (P1 - Session H) | 50 | **92.00%** | 0.4792 | 0.00% |
 
-**Key Physical Insight**: On-LoS positions (P2, P3) and Off-LoS East (P4) are detected with 100% accuracy. Position P1 is offset 30 cm from the LoS path near the West wardrobe, where direct LoS transmission is completely unobstructed. Even in this challenging position, detection accuracy is 92.0%, proving that secondary multipath scattering is sufficiently captured by subcarrier MAD and variance features.
+**Key Physical Insight**: On-LoS positions (P2, P3) are detected with 100.0% accuracy due to direct path obstruction. Off-LoS positions achieve 97.83% (P4 East, 1 error out of 46) and 92.00% (P1 West, 4 errors out of 50). In Off-LoS positions, the direct LoS path remains unblocked; detection relies entirely on secondary multipath reflections scattered from human body tissue. Across 315 empty windows from 5 different sessions spanning 7 hours and multiple days, the system produced only a single false alarm (overall baseline FAR = 0.32%).
 
 ### Axis 3: Time-of-Day Robustness
 
-| Time of Day Band | Test Samples (n) | Accuracy | Macro F1 | False Alarm Rate |
+| Time of Day Band (UTC) | Test Samples (n) | Accuracy | Macro F1 | False Alarm Rate |
 |---|---|---|---|---|
-| Morning (06:00 - 12:00) | 133 | **100.00%** | **1.0000** | 0.00% |
-| Afternoon (12:00 - 18:00) | 209 | **100.00%** | **1.0000** | 0.00% |
-| Evening / Night (18:00 - 06:00) | 243 | 98.77% | 0.9876 | 0.00% |
+| Afternoon (12:00 - 18:00 UTC) | 207 | **99.52%** | **0.9949** | 0.78% |
+| Night / Evening (18:00 - 06:00 UTC) | 377 | **98.67%** | **0.9867** | 0.00% |
 
-The system exhibits near-flawless invariance to ambient temperature and circadian RF environment changes.
+All recordings were performed during afternoon and evening/night hours (corresponding to 09:00 to 21:30 local BRT time). The system exhibits high invariance to circadian RF environment changes and diurnal ambient drift.
 
 ### Axis 4: Transmitter-Receiver Distance
 
