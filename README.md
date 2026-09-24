@@ -21,7 +21,7 @@ The goal is to build a **device-free presence detection system** that leverages 
 
 | Stage | Status | Metric / Output |
 |---|---|---|
-| Hardware setup & data collection | Done | ESP32-S3 HT40 link, 15 recorded sessions across 3 campaigns (11 valid ingested: C–M) |
+| Hardware setup & data collection | Done | ESP32-S3 HT40 link, 15 recorded sessions across 3 campaigns (11 valid ingested: C-M) |
 | Signal processing & mask | Done | 162 shared valid HT40 subcarriers (out of 192 raw subcarriers) |
 | Feature dataset assembly | Done | 3,889 windows $\times$ 648 statistical features (2,095 empty, 1,794 occupied) |
 | ML model training (10-fold CV) | Done | MLP (0.9922), GB (0.9789), SVM (0.9748), RF (0.9721) Macro $F_1$ |
@@ -41,8 +41,8 @@ wifi-csi-presence-detection/
 ├── data/                               # 3-Tier Unidirectional Data Storage
 │   ├── 01_raw/                         # Immutable raw acquisition dumps
 │   │   ├── first_test/                 # Exploratory benchmark campaign
-│   │   ├── pilot/                      # Pilot campaign (sessions A–F)
-│   │   └── main/                       # Main campaign (sessions G–M)
+│   │   ├── pilot/                      # Pilot campaign (sessions A-F)
+│   │   └── main/                       # Main campaign (sessions G-M)
 │   ├── 02_interim/                     # Calibrated amplitude arrays & masks
 │   └── 03_processed/                   # Canonical feature datasets & splits
 │       ├── features_ht40.parquet       # Canonical tabular feature dataset (Parquet)

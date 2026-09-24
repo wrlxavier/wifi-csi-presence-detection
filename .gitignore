@@ -222,6 +222,7 @@ __marimo__/
 data/**/*.csv
 data/**/*.json
 data/**/*.parquet
+data/**/*.png
 
 # Reports and generated figures
 reports/figures/**/*.png
@@ -230,6 +231,7 @@ reports/tables/**/*.tex
 reports/tables/**/*.csv
 reports/logs/**/*.json
 reports/logs/**/*.csv
+reports/logs/**/*.png
 
 # Generated artifacts (legacy outputs)
 outputs/**/*.csv
