@@ -1,4 +1,4 @@
-.PHONY: help install pipeline train evaluate figures test all clean
+.PHONY: help install pipeline train evaluate figures test all clean live
 
 UV := uv
 
@@ -10,8 +10,10 @@ help:
 	@echo "  make evaluate   - Evaluate test set and compute robustness benchmarks"
 	@echo "  make figures    - Generate all publication-ready figures & LaTeX tables"
 	@echo "  make test       - Run automated pytest suite"
+	@echo "  make live       - Launch real-time presence detection live monitor"
 	@echo "  make all        - Execute pipeline -> train -> evaluate -> figures"
 	@echo "  make clean      - Clean cache and transient build files"
+
 
 install:
 	$(UV) pip install -e ".[dev]"
@@ -31,7 +33,11 @@ figures:
 test:
 	$(UV) run pytest tests/ -v
 
+live:
+	$(UV) run python scripts/realtime_presence.py
+
 all: pipeline train evaluate figures
+
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
