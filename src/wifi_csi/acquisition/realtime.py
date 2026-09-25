@@ -174,30 +174,76 @@ class RealtimeCSIInference:
 
 
     def _load_model(self, model_name: str | None) -> tuple[str, Any, dict[str, Any]]:
-        """Load trained pipeline bundle (auto-resolving best model if unspecified)."""
+        """Load trained pipeline bundle (auto-resolving best model per modality if unspecified)."""
         resolved_name = model_name
-        if not resolved_name:
+
+        # 1. Resolve light modality requests to designated best light model
+        if resolved_name in ["reduced", "optimal_reduced", "optimal", "optimal_reduced_model", "light"]:
+            opt_json = self.repo_root / "reports/logs/optimal_features.json"
+            best_light = None
+            if opt_json.exists():
+                try:
+                    with open(opt_json, "r", encoding="utf-8") as f:
+                        opt_meta = json.load(f)
+                        best_light = opt_meta.get("best_light_model")
+                except (json.JSONDecodeError, OSError):
+                    pass
+            resolved_name = best_light or "gradient_boosting_light"
+
+        # 2. Resolve standard modality requests to designated best standard model
+        if not resolved_name or resolved_name in ["default", "standard", "full"]:
             eval_report = self.repo_root / "reports/logs/evaluation_report.json"
+            best_standard = None
             if eval_report.exists():
                 try:
                     with open(eval_report, "r", encoding="utf-8") as f:
                         data = json.load(f)
-                        resolved_name = data.get("best_model")
+                        best_standard = data.get("best_model")
                 except (json.JSONDecodeError, OSError):
                     pass
+            resolved_name = best_standard or "mlp"
 
-
-        if not resolved_name:
-            resolved_name = "mlp"
+        # 3. Handle model architecture aliases
+        alias_map = {
+            "rf": "random_forest",
+            "rf_light": "random_forest_light",
+            "rf_l": "random_forest_light",
+            "gb": "gradient_boosting",
+            "gb_light": "gradient_boosting_light",
+            "gb_l": "gradient_boosting_light",
+            "mlp_l": "mlp_light",
+            "svm_l": "svm_light",
+        }
+        if resolved_name in alias_map:
+            resolved_name = alias_map[resolved_name]
 
         bundle_dir = self.repo_root / f"models/registry/{resolved_name}_bundle"
         if not bundle_dir.exists():
             # Check models directory fallback
-            flat_file = self.repo_root / f"models/{resolved_name}.pkl"
-            if flat_file.exists():
-                raise FileNotFoundError(
-                    f"Model bundle {bundle_dir} not found. Please run 'make train' or ensure registry is populated."
-                )
+            flat_candidates = [
+                self.repo_root / f"models/{resolved_name}.pkl",
+                self.repo_root / f"models/{resolved_name}_model.pkl",
+            ]
+            flat_file = next((f for f in flat_candidates if f.exists()), None)
+            if flat_file:
+                import joblib
+                pipeline = joblib.load(flat_file)
+                card = {"model_name": resolved_name, "metadata": {}}
+                opt_json = self.repo_root / "reports/logs/optimal_features.json"
+                if opt_json.exists() and ("reduced" in resolved_name or "light" in resolved_name):
+                    with open(opt_json, "r", encoding="utf-8") as f:
+                        opt_meta = json.load(f)
+                        card["metadata"] = {
+                            "is_reduced": True,
+                            "is_light": True,
+                            "raw_subcarrier_indices": opt_meta.get("raw_subcarrier_indices", []),
+                            "feature_columns": opt_meta.get("optimal_feature_columns", []),
+                            "optimal_subcarriers": opt_meta.get("optimal_subcarriers", []),
+                            "n_subcarriers": opt_meta.get("num_subcarriers", 5),
+                            "n_features": opt_meta.get("num_features", 20),
+                        }
+                return resolved_name, pipeline, card
+
             raise FileNotFoundError(f"Bundle directory does not exist: {bundle_dir}")
 
         pipeline, card = load_model_bundle(bundle_dir)
@@ -205,6 +251,12 @@ class RealtimeCSIInference:
 
     def _load_subcarrier_mapping(self) -> tuple[np.ndarray, list[str]]:
         """Load valid subcarrier indices mapping and feature column headers."""
+        metadata = self.model_card.get("metadata", {})
+        if metadata.get("is_reduced") or ("raw_subcarrier_indices" in metadata and "feature_columns" in metadata):
+            raw_indices = np.array(metadata["raw_subcarrier_indices"], dtype=int)
+            feature_names = list(metadata["feature_columns"])
+            return raw_indices, feature_names
+
         candidates = [
             self.repo_root / "data/03_processed/valid_subcarrier_mapping.csv",
             self.repo_root / "outputs/pipeline_v1/valid_subcarrier_mapping_v1.csv",

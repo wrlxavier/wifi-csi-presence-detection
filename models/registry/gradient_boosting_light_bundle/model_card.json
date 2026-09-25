@@ -1,0 +1,85 @@
+{
+  "model_name": "gradient_boosting_light",
+  "created_at_utc": "2026-09-25T04:30:51.873304+00:00",
+  "pipeline_steps": [
+    "classifier"
+  ],
+  "classifier_class": "HistGradientBoostingClassifier",
+  "classifier_params": {
+    "categorical_features": "from_dtype",
+    "class_weight": null,
+    "early_stopping": "auto",
+    "interaction_cst": null,
+    "l2_regularization": 0.0,
+    "learning_rate": 0.1,
+    "loss": "log_loss",
+    "max_bins": 255,
+    "max_depth": null,
+    "max_features": 1.0,
+    "max_iter": 100,
+    "max_leaf_nodes": 31,
+    "min_samples_leaf": 20,
+    "monotonic_cst": null,
+    "n_iter_no_change": 10,
+    "random_state": 42,
+    "scoring": "loss",
+    "tol": 1e-07,
+    "validation_fraction": 0.1,
+    "verbose": 0,
+    "warm_start": false
+  },
+  "metadata": {
+    "is_light": true,
+    "is_reduced": true,
+    "parent_model": "gradient_boosting",
+    "optimal_subcarriers": [
+      "sc041",
+      "sc040",
+      "sc042",
+      "sc047",
+      "sc012"
+    ],
+    "raw_subcarrier_indices": [
+      48,
+      47,
+      49,
+      54,
+      18
+    ],
+    "feature_columns": [
+      "sc041_var",
+      "sc041_mad",
+      "sc041_range",
+      "sc041_iqr",
+      "sc040_var",
+      "sc040_mad",
+      "sc040_range",
+      "sc040_iqr",
+      "sc042_var",
+      "sc042_mad",
+      "sc042_range",
+      "sc042_iqr",
+      "sc047_var",
+      "sc047_mad",
+      "sc047_range",
+      "sc047_iqr",
+      "sc012_var",
+      "sc012_mad",
+      "sc012_range",
+      "sc012_iqr"
+    ],
+    "n_subcarriers": 5,
+    "n_features": 20,
+    "reduction_pct": 96.91,
+    "accuracy": 0.9761,
+    "f1_macro": 0.9759,
+    "false_alarm_rate": 0.0063,
+    "latency_ms": 0.0043,
+    "size_kb": 389.9,
+    "test_metrics": {
+      "accuracy": 0.9761,
+      "f1_macro": 0.9759,
+      "false_alarm_rate": 0.0063
+    }
+  }
+}

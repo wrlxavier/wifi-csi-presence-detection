@@ -1,0 +1,80 @@
+{
+  "model_name": "svm_light",
+  "created_at_utc": "2026-09-25T04:30:52.248268+00:00",
+  "pipeline_steps": [
+    "scaler",
+    "classifier"
+  ],
+  "classifier_class": "SVC",
+  "classifier_params": {
+    "C": 10,
+    "break_ties": false,
+    "cache_size": 200,
+    "class_weight": null,
+    "coef0": 0.0,
+    "decision_function_shape": "ovr",
+    "degree": 3,
+    "gamma": "scale",
+    "kernel": "rbf",
+    "max_iter": -1,
+    "probability": "deprecated",
+    "random_state": 42,
+    "shrinking": true,
+    "tol": 0.001,
+    "verbose": false
+  },
+  "metadata": {
+    "is_light": true,
+    "is_reduced": true,
+    "parent_model": "svm",
+    "optimal_subcarriers": [
+      "sc041",
+      "sc040",
+      "sc042",
+      "sc047",
+      "sc012"
+    ],
+    "raw_subcarrier_indices": [
+      48,
+      47,
+      49,
+      54,
+      18
+    ],
+    "feature_columns": [
+      "sc041_var",
+      "sc041_mad",
+      "sc041_range",
+      "sc041_iqr",
+      "sc040_var",
+      "sc040_mad",
+      "sc040_range",
+      "sc040_iqr",
+      "sc042_var",
+      "sc042_mad",
+      "sc042_range",
+      "sc042_iqr",
+      "sc047_var",
+      "sc047_mad",
+      "sc047_range",
+      "sc047_iqr",
+      "sc012_var",
+      "sc012_mad",
+      "sc012_range",
+      "sc012_iqr"
+    ],
+    "n_subcarriers": 5,
+    "n_features": 20,
+    "reduction_pct": 96.91,
+    "accuracy": 0.9504,
+    "f1_macro": 0.95,
+    "false_alarm_rate": 0.0317,
+    "latency_ms": 0.0209,
+    "size_kb": 83.2,
+    "test_metrics": {
+      "accuracy": 0.9504,
+      "f1_macro": 0.95,
+      "false_alarm_rate": 0.0317
+    }
+  }
+}

@@ -75,18 +75,33 @@ def test_realtime_csi_inference_tumbling_mode():
 
 def test_discover_available_models():
     repo_root = Path.cwd()
-    models, best = discover_available_models(repo_root)
+    models, best_standard, best_light = discover_available_models(repo_root)
 
-    assert len(models) >= 4
+    assert len(models) == 8
+    assert best_standard == "mlp"
+    assert best_light == "gradient_boosting_light"
+
     model_keys = [m["key"] for m in models]
+    # Standard models
     assert "mlp" in model_keys
     assert "random_forest" in model_keys
     assert "gradient_boosting" in model_keys
     assert "svm" in model_keys
 
-    # Best model should be first in the list
-    assert models[0]["is_best"] is True
-    assert models[0]["key"] == best
+    # Light models
+    assert "mlp_light" in model_keys
+    assert "random_forest_light" in model_keys
+    assert "gradient_boosting_light" in model_keys
+    assert "svm_light" in model_keys
+
+    # Best standard model should be first in the standard group
+    assert models[0]["is_best_standard"] is True
+    assert models[0]["key"] == best_standard
+
+    # Best light model should be first in the light group
+    light_models = [m for m in models if m["is_reduced"]]
+    assert light_models[0]["is_best_light"] is True
+    assert light_models[0]["key"] == best_light
 
 
 def test_build_menu_aliases():
@@ -95,12 +110,22 @@ def test_build_menu_aliases():
         {"key": "random_forest"},
         {"key": "gradient_boosting"},
         {"key": "svm"},
+        {"key": "gradient_boosting_light"},
+        {"key": "random_forest_light"},
+        {"key": "mlp_light"},
+        {"key": "svm_light"},
     ]
-    aliases = build_menu_aliases(mock_models, best_model_name="mlp")
+    aliases = build_menu_aliases(
+        mock_models,
+        best_standard_name="mlp",
+        best_light_name="gradient_boosting_light",
+    )
 
-    # Default / Enter
+    # Default / Enter / Standard modality
     assert aliases[""] == "mlp"
     assert aliases["default"] == "mlp"
+    assert aliases["standard"] == "mlp"
+    assert aliases["full"] == "mlp"
 
     # Numeric selections
     assert aliases["1"] == "mlp"
@@ -108,7 +133,7 @@ def test_build_menu_aliases():
     assert aliases["3"] == "gradient_boosting"
     assert aliases["4"] == "svm"
 
-    # Exact names and shortcuts
+    # Exact names and shortcuts for full models
     assert aliases["mlp"] == "mlp"
     assert aliases["rf"] == "random_forest"
     assert aliases["random_forest"] == "random_forest"
@@ -117,22 +142,41 @@ def test_build_menu_aliases():
     assert aliases["gbdt"] == "gradient_boosting"
     assert aliases["svm"] == "svm"
 
+    # Exact names and shortcuts for light models
+    assert aliases["mlp_light"] == "mlp_light"
+    assert aliases["mlp_l"] == "mlp_light"
+    assert aliases["svm_light"] == "svm_light"
+    assert aliases["svm_l"] == "svm_light"
+    assert aliases["rf_light"] == "random_forest_light"
+    assert aliases["rf_l"] == "random_forest_light"
+    assert aliases["gb_light"] == "gradient_boosting_light"
+    assert aliases["gb_l"] == "gradient_boosting_light"
+
+    # Modality shortcut: reduced / light resolves to best light model
+    assert aliases["reduced"] == "gradient_boosting_light"
+    assert aliases["light"] == "gradient_boosting_light"
+    assert aliases["optimal_reduced"] == "gradient_boosting_light"
+
 
 def test_render_model_menu():
     repo_root = Path.cwd()
-    models, _ = discover_available_models(repo_root)
+    models, _, _ = discover_available_models(repo_root)
 
     # ANSI Box render
     rendered_box = render_model_menu(models, inner_w=74, plain=False)
     assert "WI-FI CSI REAL-TIME PRESENCE DETECTION" in rendered_box
     assert "MODEL SELECTION MENU" in rendered_box
-    assert "RECOMMENDED / BEST" in rendered_box
+    assert "RECOMMENDED STANDARD" in rendered_box
     assert "mlp" in rendered_box
+    assert "Support Vector Machine" in rendered_box
 
-    # Plain render
+    # Plain render (untruncated lines)
     rendered_plain = render_model_menu(models, plain=True)
     assert "MODEL SELECTION" in rendered_plain
+    assert "RECOMMENDED STANDARD" in rendered_plain
+    assert "RECOMMENDED LIGHT" in rendered_plain
     assert "mlp" in rendered_plain
+    assert "svm_light" in rendered_plain
 
 
 def test_prompt_model_selection(monkeypatch):
@@ -152,3 +196,44 @@ def test_prompt_model_selection(monkeypatch):
     monkeypatch.setattr("builtins.input", lambda _: "svm")
     chosen_svm = prompt_model_selection(repo_root, plain_mode=True)
     assert chosen_svm == "svm"
+
+    # Simulate typing 'svm_light'
+    monkeypatch.setattr("builtins.input", lambda _: "svm_light")
+    chosen_svm_light = prompt_model_selection(repo_root, plain_mode=True)
+    assert chosen_svm_light == "svm_light"
+
+    # Simulate typing 'reduced' -> resolves to best light model
+    monkeypatch.setattr("builtins.input", lambda _: "reduced")
+    chosen_red = prompt_model_selection(repo_root, plain_mode=True)
+    assert chosen_red == "gradient_boosting_light"
+
+
+def test_realtime_csi_inference_reduced_model():
+    # 'reduced' and 'optimal_reduced' both resolve to the best light model (gradient_boosting_light)
+    engine = RealtimeCSIInference(port="/dev/ttyUSB0", model_name="reduced", min_samples=5)
+    assert engine.model_name == "gradient_boosting_light"
+    assert len(engine.raw_indices) == 5
+    assert len(engine.feature_names) == 20
+    assert engine.raw_indices.tolist() == [48, 47, 49, 54, 18]
+
+    engine2 = RealtimeCSIInference(port="/dev/ttyUSB0", model_name="optimal_reduced", min_samples=5)
+    assert engine2.model_name == "gradient_boosting_light"
+    assert len(engine2.raw_indices) == 5
+
+    # Verify buffering response
+    res = engine.predict_latest()
+    assert res["status"] == "buffering"
+
+
+def test_realtime_csi_inference_light_family():
+    light_models = ["mlp_light", "svm_light", "random_forest_light", "gradient_boosting_light"]
+    for m in light_models:
+        engine = RealtimeCSIInference(port="/dev/ttyUSB0", model_name=m, min_samples=5)
+        assert engine.model_name == m
+        assert len(engine.raw_indices) == 5
+        assert len(engine.feature_names) == 20
+        assert engine.raw_indices.tolist() == [48, 47, 49, 54, 18]
+
+        res = engine.predict_latest()
+        assert res["status"] == "buffering"
+

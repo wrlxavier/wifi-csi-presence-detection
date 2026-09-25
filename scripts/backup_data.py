@@ -22,7 +22,14 @@ import zipfile
 
 def _find_repo_root(start_path: Path | None = None) -> Path:
     """Find repository root by looking for pyproject.toml or .git."""
-    curr = (start_path or Path(__file__)).resolve()
+    if start_path is not None:
+        p = Path(start_path).resolve()
+        for parent in [p] + list(p.parents):
+            if (parent / "pyproject.toml").exists() or (parent / ".git").exists():
+                return parent
+        return p
+
+    curr = Path(__file__).resolve()
     for parent in [curr] + list(curr.parents):
         if (parent / "pyproject.toml").exists() or (parent / ".git").exists():
             return parent
@@ -35,17 +42,25 @@ def _get_untracked_files(repo_root: Path, target_archive_path: Path | None = Non
 
     # 1. Primary discovery via git if available
     git_dir = repo_root / ".git"
+    used_git = False
     if git_dir.exists():
         try:
             # Files ignored by .gitignore (data, models, outputs, reports)
             cmd_ignored = ["git", "ls-files", "-z", "--others", "--ignored", "--exclude-standard"]
             res_ignored = subprocess.run(cmd_ignored, cwd=repo_root, capture_output=True, check=True)
             raw_rel_paths.extend([f.decode("utf-8", "surrogateescape") for f in res_ignored.stdout.split(b"\0") if f])
+
+            # Untracked files in project directories not yet committed (e.g., new light models/cards)
+            cmd_untracked = ["git", "ls-files", "-z", "--others", "--exclude-standard"]
+            res_untracked = subprocess.run(cmd_untracked, cwd=repo_root, capture_output=True, check=True)
+            raw_rel_paths.extend([f.decode("utf-8", "surrogateescape") for f in res_untracked.stdout.split(b"\0") if f])
+            used_git = True
         except (subprocess.SubprocessError, OSError):
             raw_rel_paths.clear()
+            used_git = False
 
-    # 2. Fallback filesystem scan if git is unavailable or returned empty
-    if not raw_rel_paths:
+    # 2. Fallback filesystem scan if git is unavailable or failed
+    if not used_git:
         data_roots = ["data", "models", "outputs", "reports"]
         valid_exts = {
             ".csv", ".json", ".parquet", ".png", ".jpg", ".jpeg", ".svg",
@@ -59,6 +74,12 @@ def _get_untracked_files(repo_root: Path, target_archive_path: Path | None = Non
                         p = Path(root) / file
                         if p.suffix.lower() in valid_exts and p.name != ".gitkeep":
                             raw_rel_paths.append(str(p.relative_to(repo_root)))
+
+    # 3. Always ensure all model bundle cards in models/registry/ are included for a self-contained archive
+    registry_dir = repo_root / "models/registry"
+    if registry_dir.is_dir():
+        for card in registry_dir.glob("*/model_card.json"):
+            raw_rel_paths.append(str(card.relative_to(repo_root)))
 
     # Transient and environment patterns to exclude from backup
     exclude_dir_names = {
@@ -129,12 +150,26 @@ def _validate_structure(repo_root: Path) -> tuple[bool, list[str]]:
         checks.append("data/03_processed: Missing canonical features dataset or splits (train/val/test.parquet)")
         success = False
 
-    # 3. Trained model checkpoints and registry bundles
+    # 3. Trained model checkpoints and registry bundles (Standard & Light families)
     models_dir = repo_root / "models"
     model_pickles = list(models_dir.glob("*.pkl")) if models_dir.exists() else []
     registry_dir = models_dir / "registry"
     has_registry = registry_dir.exists() and any(registry_dir.iterdir())
-    if model_pickles and has_registry:
+
+    standard_stems = {"mlp", "random_forest", "gradient_boosting", "svm"}
+    light_stems = {"mlp_light", "random_forest_light", "gradient_boosting_light", "svm_light"}
+    found_stems = {p.stem for p in model_pickles}
+    found_bundles = {d.name for d in registry_dir.iterdir() if d.is_dir()} if registry_dir.exists() else set()
+
+    has_std = standard_stems.issubset(found_stems) and all(f"{m}_bundle" in found_bundles for m in standard_stems)
+    has_light = light_stems.issubset(found_stems) and all(f"{m}_bundle" in found_bundles for m in light_stems)
+
+    if has_std and has_light:
+        checks.append(
+            f"models: Found {len(model_pickles)} checkpoints and {len(found_bundles)} bundles "
+            "(Standard & Light model families complete)"
+        )
+    elif model_pickles and has_registry:
         checks.append(f"models: Found {len(model_pickles)} model checkpoints and pipeline registry bundles")
     else:
         checks.append("models: Missing trained model checkpoints (*.pkl) or registry bundles")
@@ -152,10 +187,16 @@ def _validate_structure(repo_root: Path) -> tuple[bool, list[str]]:
     # 5. Thesis reports, evaluation logs, and LaTeX tables
     reports_dir = repo_root / "reports"
     report_files = [f for f in reports_dir.glob("*/*") if f.is_file()] if reports_dir.exists() else []
+    opt_file = reports_dir / "logs/optimal_features.json"
     if report_files:
-        checks.append(f"reports: Found {len(report_files)} thesis figures, LaTeX tables, and evaluation logs")
+        opt_status = " (optimal_features.json verified)" if opt_file.is_file() else ""
+        checks.append(f"reports: Found {len(report_files)} thesis figures, LaTeX tables, and evaluation logs{opt_status}")
     else:
         checks.append("reports: Missing thesis publication figures, tables, or evaluation logs")
+        success = False
+
+    if not opt_file.is_file():
+        checks.append("reports/logs: Missing optimal_features.json feature selection metadata")
         success = False
 
     return success, checks

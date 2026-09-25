@@ -1,0 +1,91 @@
+{
+  "model_name": "mlp_light",
+  "created_at_utc": "2026-09-25T04:30:53.211669+00:00",
+  "pipeline_steps": [
+    "scaler",
+    "classifier"
+  ],
+  "classifier_class": "MLPClassifier",
+  "classifier_params": {
+    "activation": "relu",
+    "alpha": 0.0001,
+    "batch_size": "auto",
+    "beta_1": 0.9,
+    "beta_2": 0.999,
+    "early_stopping": true,
+    "epsilon": 1e-08,
+    "hidden_layer_sizes": [
+      128,
+      64
+    ],
+    "learning_rate": "constant",
+    "learning_rate_init": 0.001,
+    "max_fun": 15000,
+    "max_iter": 300,
+    "momentum": 0.9,
+    "n_iter_no_change": 10,
+    "nesterovs_momentum": true,
+    "power_t": 0.5,
+    "random_state": 42,
+    "shuffle": true,
+    "solver": "adam",
+    "tol": 0.0001,
+    "validation_fraction": 0.1,
+    "verbose": false,
+    "warm_start": false
+  },
+  "metadata": {
+    "is_light": true,
+    "is_reduced": true,
+    "parent_model": "mlp",
+    "optimal_subcarriers": [
+      "sc041",
+      "sc040",
+      "sc042",
+      "sc047",
+      "sc012"
+    ],
+    "raw_subcarrier_indices": [
+      48,
+      47,
+      49,
+      54,
+      18
+    ],
+    "feature_columns": [
+      "sc041_var",
+      "sc041_mad",
+      "sc041_range",
+      "sc041_iqr",
+      "sc040_var",
+      "sc040_mad",
+      "sc040_range",
+      "sc040_iqr",
+      "sc042_var",
+      "sc042_mad",
+      "sc042_range",
+      "sc042_iqr",
+      "sc047_var",
+      "sc047_mad",
+      "sc047_range",
+      "sc047_iqr",
+      "sc012_var",
+      "sc012_mad",
+      "sc012_range",
+      "sc012_iqr"
+    ],
+    "n_subcarriers": 5,
+    "n_features": 20,
+    "reduction_pct": 96.91,
+    "accuracy": 0.9521,
+    "f1_macro": 0.9519,
+    "false_alarm_rate": 0.0444,
+    "latency_ms": 0.0035,
+    "size_kb": 268.3,
+    "test_metrics": {
+      "accuracy": 0.9521,
+      "f1_macro": 0.9519,
+      "false_alarm_rate": 0.0444
+    }
+  }
+}

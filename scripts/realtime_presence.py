@@ -153,8 +153,13 @@ class TerminalDashboard:
         lines.append(
             f"{FG_CYAN}║{BOLD}{FG_BRIGHT_WHITE}{header_title:^{inner_w}}{RESET}{FG_CYAN}║{RESET}"
         )
-        model_info = f"Model: {self.engine.model_name.upper()}  │  Window: {self.engine.window_seconds:.1f}s ({mode_str})  │  Port: {self.engine.port}"
+        n_sc = len(self.engine.raw_indices)
+        n_ft = len(self.engine.feature_names)
+        feat_tag = f" [{n_sc} SC / {n_ft} Feats]" if n_sc < 162 else ""
+        model_info = f"Model: {self.engine.model_name.upper()}{feat_tag}"
+        windown_n_port_info = f"Window: {self.engine.window_seconds:.1f}s ({mode_str})  │  Port: {self.engine.port}"
         lines.append(f"{FG_CYAN}║{DIM}{FG_WHITE}{model_info:^{inner_w}}{RESET}{FG_CYAN}║{RESET}")
+        lines.append(f"{FG_CYAN}║{DIM}{FG_WHITE}{windown_n_port_info:^{inner_w}}{RESET}{FG_CYAN}║{RESET}")
         lines.append(f"{FG_CYAN}╠{'═' * inner_w}╣{RESET}")
 
         # ── Primary Status Banner ───────────────────────────────────────────
@@ -277,7 +282,7 @@ class TerminalDashboard:
 
         # ── Recent Predictions Log (Timeline) ────────────────────────────────
         lines.append(
-            f"{FG_CYAN}║ {BOLD}{FG_BRIGHT_WHITE}RECENT INFERENCE LOG (Last {len(self.history)} events):{' ' * (inner_w - 38)}║{RESET}"
+            f"{FG_CYAN}║ {BOLD}{FG_BRIGHT_WHITE}RECENT INFERENCE LOG (Last {len(self.history)} events):{' ' * (inner_w - 39)}║{RESET}"
         )
         if not self.history:
             lines.append(
@@ -351,7 +356,10 @@ class TerminalDashboard:
             f"{BOLD}{FG_CYAN}═══════════════════════════════════════════════════════════════{RESET}"
         )
         print(f"  Duration           : {format_duration(duration)} ({duration:.1f} s)")
-        print(f"  Model Used         : {self.engine.model_name.upper()} (Optimal pipeline)")
+        n_sc = len(self.engine.raw_indices)
+        n_ft = len(self.engine.feature_names)
+        feat_tag = f" ({n_sc} subcarriers / {n_ft} features, -96.9% DSP)" if n_sc < 162 else " (Full 162 subcarriers / 648 features)"
+        print(f"  Model Used         : {self.engine.model_name.upper()}{feat_tag}")
         print(f"  Serial Port        : {self.engine.port} @ {self.engine.baudrate} bps")
         print(f"  Packets Received   : {self.engine.total_packets_received:,}")
         print(
@@ -386,8 +394,17 @@ def format_box_line(text_with_ansi: str, inner_width: int) -> str:
     return f"{FG_CYAN}║{RESET}{text_with_ansi}{' ' * pad}{FG_CYAN}║{RESET}"
 
 
-def _summarize_architecture(classifier_class: str, params: dict[str, Any]) -> str:
+def _summarize_architecture(
+    classifier_class: str, params: dict[str, Any], metadata: dict[str, Any] | None = None
+) -> str:
     """Generate concise human-readable summary of classifier architecture."""
+    meta = metadata or {}
+    if meta.get("is_reduced") or "optimal_subcarriers" in meta:
+        n_sc = meta.get("n_subcarriers", 5)
+        n_feat = meta.get("n_features", 20)
+        red_pct = meta.get("reduction_pct", 96.9)
+        c_name = classifier_class.replace("Classifier", "") if classifier_class else "RF"
+        return f"Reduced {c_name} ({n_sc} SCs, {n_feat} features, -{red_pct:.1f}% DSP)"
     if classifier_class == "MLPClassifier":
         layers = params.get("hidden_layer_sizes", [50, 50])
         solver = params.get("solver", "adam")
@@ -408,28 +425,33 @@ def _summarize_architecture(classifier_class: str, params: dict[str, Any]) -> st
     return classifier_class or "Scikit-Learn Pipeline"
 
 
-def discover_available_models(repo_root: Path) -> tuple[list[dict[str, Any]], str]:
+def discover_available_models(
+    repo_root: Path,
+) -> tuple[list[dict[str, Any]], str, str]:
     """Discover registered model bundles and offline evaluation metrics.
 
     Returns
     -------
     models : list of dict
-        Discovered models with metadata and metrics, sorted with the recommended model first.
-    best_model_name : str
-        Identifier of the top performing / recommended model.
+        Discovered models with metadata and metrics, sorted cleanly into Standard and Light modalities.
+    best_standard_model : str
+        Identifier of the top performing standard model (full feature modality).
+    best_light_model : str
+        Identifier of the top performing light model (reduced feature modality).
     """
     registry_dir = repo_root / "models/registry"
     eval_report_file = repo_root / "reports/logs/evaluation_report.json"
+    optimal_features_file = repo_root / "reports/logs/optimal_features.json"
 
-    # 1. Load evaluation report for offline metrics & best model identification
+    # 1. Load evaluation report for offline metrics & best standard model identification
     eval_metrics: dict[str, dict[str, Any]] = {}
-    best_model_name = "mlp"
+    best_standard_model = "mlp"
 
     if eval_report_file.exists():
         try:
             with open(eval_report_file, "r", encoding="utf-8") as f:
                 eval_data = json.load(f)
-                best_model_name = eval_data.get("best_model", "mlp")
+                best_standard_model = eval_data.get("best_model", "mlp")
                 for item in eval_data.get("validation", []):
                     m_name = item.get("model")
                     if m_name:
@@ -437,11 +459,24 @@ def discover_available_models(repo_root: Path) -> tuple[list[dict[str, Any]], st
         except (json.JSONDecodeError, OSError):
             pass
 
-    # 2. Discover model bundles from registry
+    # 2. Load optimal features report for best light model identification
+    best_light_model = "gradient_boosting_light"
+    if optimal_features_file.exists():
+        try:
+            with open(optimal_features_file, "r", encoding="utf-8") as f:
+                opt_data = json.load(f)
+                best_light_model = opt_data.get("best_light_model", "gradient_boosting_light")
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # 3. Discover model bundles from registry (excluding any legacy/duplicate bundles)
     found_bundles: list[Path] = []
     if registry_dir.exists():
         found_bundles = sorted(
-            [p for p in registry_dir.glob("*_bundle") if p.is_dir()],
+            [
+                p for p in registry_dir.glob("*_bundle")
+                if p.is_dir() and p.name != "optimal_reduced_bundle"
+            ],
             key=lambda p: p.name,
         )
 
@@ -452,6 +487,10 @@ def discover_available_models(repo_root: Path) -> tuple[list[dict[str, Any]], st
         "random_forest": "Random Forest",
         "gradient_boosting": "Gradient Boosting (GBDT)",
         "svm": "Support Vector Machine (SVM)",
+        "mlp_light": "Multi-Layer Perceptron (MLP) [Light]",
+        "random_forest_light": "Random Forest [Light]",
+        "gradient_boosting_light": "Gradient Boosting (GBDT) [Light]",
+        "svm_light": "Support Vector Machine (SVM) [Light]",
     }
 
     if found_bundles:
@@ -468,8 +507,17 @@ def discover_available_models(repo_root: Path) -> tuple[list[dict[str, Any]], st
 
             c_class = card_data.get("classifier_class", "")
             c_params = card_data.get("classifier_params", {})
+            c_meta = card_data.get("metadata", {})
             m_metrics = eval_metrics.get(m_key, {})
-            is_best = m_key == best_model_name
+            is_light = bool(c_meta.get("is_light", False) or "light" in m_key)
+            is_red = bool(c_meta.get("is_reduced", False) or is_light)
+            is_best_standard = (m_key == best_standard_model)
+            is_best_light = (m_key == best_light_model)
+            is_best = is_best_standard or is_best_light
+
+            f1 = m_metrics.get("f1_macro") if m_metrics.get("f1_macro") is not None else c_meta.get("f1_macro")
+            acc = m_metrics.get("accuracy") if m_metrics.get("accuracy") is not None else c_meta.get("accuracy")
+            far = m_metrics.get("false_alarm_rate") if m_metrics.get("false_alarm_rate") is not None else c_meta.get("false_alarm_rate")
 
             models.append(
                 {
@@ -477,18 +525,27 @@ def discover_available_models(repo_root: Path) -> tuple[list[dict[str, Any]], st
                     "bundle_name": b_dir.name,
                     "display_name": friendly_names.get(m_key, m_key.replace("_", " ").title()),
                     "classifier_class": c_class,
-                    "arch_summary": _summarize_architecture(c_class, c_params),
+                    "arch_summary": _summarize_architecture(c_class, c_params, c_meta),
                     "is_best": is_best,
-                    "accuracy": m_metrics.get("accuracy"),
-                    "f1_macro": m_metrics.get("f1_macro"),
-                    "false_alarm_rate": m_metrics.get("false_alarm_rate"),
+                    "is_best_standard": is_best_standard,
+                    "is_best_light": is_best_light,
+                    "is_reduced": is_red,
+                    "is_light": is_light,
+                    "accuracy": acc,
+                    "f1_macro": f1,
+                    "false_alarm_rate": far,
+                    "latency_ms": c_meta.get("latency_ms"),
+                    "size_kb": c_meta.get("size_kb"),
                 }
             )
     else:
         # Fallback to standard models if registry is empty
         for m_key, disp in friendly_names.items():
             m_metrics = eval_metrics.get(m_key, {})
-            is_best = m_key == best_model_name
+            is_light = "light" in m_key
+            is_red = is_light
+            is_best_standard = (m_key == best_standard_model)
+            is_best_light = (m_key == best_light_model)
             models.append(
                 {
                     "key": m_key,
@@ -496,35 +553,57 @@ def discover_available_models(repo_root: Path) -> tuple[list[dict[str, Any]], st
                     "display_name": disp,
                     "classifier_class": "",
                     "arch_summary": "",
-                    "is_best": is_best,
+                    "is_best": is_best_standard or is_best_light,
+                    "is_best_standard": is_best_standard,
+                    "is_best_light": is_best_light,
+                    "is_reduced": is_red,
+                    "is_light": is_light,
                     "accuracy": m_metrics.get("accuracy"),
                     "f1_macro": m_metrics.get("f1_macro"),
                     "false_alarm_rate": m_metrics.get("false_alarm_rate"),
                 }
             )
 
-    # 3. Sort models: Best/recommended model first, then by F1 score descending, then FAR ascending
-    def sort_key(item: dict[str, Any]) -> tuple[int, float, float]:
-        is_rec = 1 if item["is_best"] else 0
+    # 4. Sort models: Standard group first (with best standard first, then F1 descending),
+    #                 then Light group (with best light first, then F1 descending).
+    def sort_key(item: dict[str, Any]) -> tuple[int, int, float, float]:
+        is_red = 1 if item["is_reduced"] else 0
+        is_best_in_group = 0 if (item.get("is_best_standard") or item.get("is_best_light")) else 1
         f1 = float(item["f1_macro"]) if item.get("f1_macro") is not None else 0.0
         far = float(item["false_alarm_rate"]) if item.get("false_alarm_rate") is not None else 1.0
-        return (-is_rec, -f1, far)
+        return (is_red, is_best_in_group, -f1, far)
 
     models.sort(key=sort_key)
-    return models, best_model_name
+    return models, best_standard_model, best_light_model
 
 
-def build_menu_aliases(models: list[dict[str, Any]], best_model_name: str) -> dict[str, str]:
+def build_menu_aliases(
+    models: list[dict[str, Any]],
+    best_standard_name: str,
+    best_light_name: str = "gradient_boosting_light",
+) -> dict[str, str]:
     """Build input mapping supporting index, name, abbreviations, and shortcuts."""
     aliases: dict[str, str] = {
-        "": best_model_name,
-        "default": best_model_name,
+        "": best_standard_name,
+        "default": best_standard_name,
+        "standard": best_standard_name,
+        "full": best_standard_name,
+        "light": best_light_name,
+        "reduced": best_light_name,
+        "optimal_reduced": best_light_name,
+        "optimal-reduced": best_light_name,
+        "optimal": best_light_name,
+        "opt": best_light_name,
     }
     short_aliases: dict[str, list[str]] = {
-        "mlp": ["mlp", "nn", "neural"],
-        "random_forest": ["rf", "forest", "randomforest", "random_forest"],
-        "gradient_boosting": ["gb", "gbdt", "boost", "gradient_boosting", "gradientboosting"],
-        "svm": ["svm", "svc", "support_vector_machine"],
+        "mlp": ["mlp", "nn", "neural", "mlp_full", "mlp-full", "full_mlp"],
+        "random_forest": ["rf", "forest", "randomforest", "random_forest", "rf_full", "rf-full", "full_rf"],
+        "gradient_boosting": ["gb", "gbdt", "boost", "gradient_boosting", "gradientboosting", "gb_full", "gb-full", "full_gb"],
+        "svm": ["svm", "svc", "support_vector_machine", "svm_full", "svm-full", "full_svm"],
+        "mlp_light": ["mlp_light", "mlp-light", "mlp_l", "mlpl", "light_mlp", "light-mlp", "l_mlp", "lmlp"],
+        "random_forest_light": ["rf_light", "rf-light", "rf_l", "rfl", "random_forest_light", "light_rf", "light-rf", "l_rf", "lrf"],
+        "gradient_boosting_light": ["gb_light", "gb-light", "gb_l", "gbl", "gradient_boosting_light", "light_gb", "light-gb", "l_gb", "lgb"],
+        "svm_light": ["svm_light", "svm-light", "svm_l", "svml", "light_svm", "light-svm", "l_svm", "lsvm"],
     }
     for idx, item in enumerate(models, start=1):
         key = item["key"]
@@ -532,8 +611,15 @@ def build_menu_aliases(models: list[dict[str, Any]], best_model_name: str) -> di
         aliases[key.lower()] = key
         aliases[key.lower().replace("_", "")] = key
         aliases[key.lower().replace("_", " ")] = key
+        aliases[key.lower().replace("-", "_")] = key
         for short in short_aliases.get(key, []):
             aliases[short] = key
+
+    # Also register generic light shortcuts that map to specific light models even if not in models loop
+    for key, shorts in short_aliases.items():
+        for short in shorts:
+            if short not in aliases:
+                aliases[short] = key
 
     return aliases
 
@@ -552,20 +638,32 @@ def render_model_menu(models: list[dict[str, Any]], inner_w: int = 74, plain: bo
         for idx, item in enumerate(models, start=1):
             disp = item["display_name"]
             key = item["key"]
-            is_best = item["is_best"]
+            is_red = item.get("is_reduced")
             arch = item.get("arch_summary")
             f1 = item.get("f1_macro")
             acc = item.get("accuracy")
             far = item.get("false_alarm_rate")
 
-            best_tag = " [RECOMMENDED / BEST]" if is_best else ""
-            lines.append(f"  [{idx}] {disp} ({key}){best_tag}")
+            tag = ""
+            if item.get("is_best_standard"):
+                tag = " [RECOMMENDED STANDARD]"
+            elif item.get("is_best_light"):
+                tag = " [RECOMMENDED LIGHT: 5 SC / 20 FEATS -96.9% DSP]"
+            elif is_red:
+                tag = " [LIGHT: 5 SC / 20 FEATS -96.9% DSP]"
+            else:
+                tag = " [FULL: 162 SC / 648 FEATS]"
+            lines.append(f"  [{idx}] {disp} ({key}){tag}")
             if arch:
                 lines.append(f"      Architecture : {arch}")
             if f1 is not None and acc is not None:
                 far_str = f"{far * 100:.2f}%" if far is not None else "--"
+                lat = item.get("latency_ms")
+                size_kb = item.get("size_kb")
+                lat_str = f" | Lat: {lat:.3f}ms" if lat is not None else ""
+                size_str = f" | Size: {size_kb:.1f}KB" if size_kb is not None else ""
                 lines.append(
-                    f"      Val Metrics  : F1: {f1 * 100:.2f}% | Acc: {acc * 100:.2f}% | FAR: {far_str}"
+                    f"      Val Metrics  : F1: {f1 * 100:.2f}% | Acc: {acc * 100:.2f}% | FAR: {far_str}{lat_str}{size_str}"
                 )
             lines.append("")
         lines.append("=" * 72)
@@ -590,14 +688,22 @@ def render_model_menu(models: list[dict[str, Any]], inner_w: int = 74, plain: bo
     for idx, item in enumerate(models, start=1):
         disp = item["display_name"]
         key = item["key"]
-        is_best = item["is_best"]
+        is_red = item.get("is_reduced")
         arch = item.get("arch_summary")
         f1 = item.get("f1_macro")
         acc = item.get("accuracy")
         far = item.get("false_alarm_rate")
 
-        best_badge = f" {BOLD}{FG_BRIGHT_YELLOW}[RECOMMENDED / BEST]{RESET}" if is_best else ""
-        line1 = f"  {BOLD}{FG_BRIGHT_CYAN}[{idx}]{RESET} {BOLD}{FG_BRIGHT_WHITE}{disp}{RESET} {DIM}({key}){RESET}{best_badge}"
+        badge = ""
+        if item.get("is_best_standard"):
+            badge = f" {BOLD}{FG_BRIGHT_YELLOW}[RECOMMENDED STANDARD]{RESET}"
+        elif item.get("is_best_light"):
+            badge = f" {BOLD}{FG_BRIGHT_CYAN}[RECOMMENDED LIGHT │ 5 SC / 20 FEATS -96.9% DSP]{RESET}"
+        elif is_red:
+            badge = f" {BOLD}{FG_CYAN}[LIGHT │ 5 SC / 20 FEATS -96.9% DSP]{RESET}"
+        else:
+            badge = f" {DIM}{FG_GRAY}[FULL │ 162 SC / 648 FEATS]{RESET}"
+        line1 = f"  {BOLD}{FG_BRIGHT_CYAN}[{idx}]{RESET} {BOLD}{FG_BRIGHT_WHITE}{disp}{RESET} {DIM}({key}){RESET}{badge}"
         lines.append(format_box_line(line1, inner_w))
 
         if arch:
@@ -606,7 +712,11 @@ def render_model_menu(models: list[dict[str, Any]], inner_w: int = 74, plain: bo
 
         if f1 is not None and acc is not None:
             far_str = f"{far * 100:.2f}%" if far is not None else "--"
-            metrics_str = f"F1: {f1 * 100:.2f}% │ Acc: {acc * 100:.2f}% │ FAR: {far_str}"
+            lat = item.get("latency_ms")
+            size_kb = item.get("size_kb")
+            lat_str = f" │ Lat: {lat:.3f}ms" if lat is not None else ""
+            size_str = f" │ Size: {size_kb:.1f}KB" if size_kb is not None else ""
+            metrics_str = f"F1: {f1 * 100:.2f}% │ Acc: {acc * 100:.2f}% │ FAR: {far_str}{lat_str}{size_str}"
             line3 = f"      {FG_GREEN}Val Metrics  : {metrics_str}{RESET}"
             lines.append(format_box_line(line3, inner_w))
 
@@ -624,20 +734,20 @@ def prompt_model_selection(repo_root: Path, plain_mode: bool = False) -> str:
     str
         The selected model bundle name (e.g. 'mlp', 'random_forest').
     """
-    models, best_model_name = discover_available_models(repo_root)
+    models, best_standard_name, best_light_name = discover_available_models(repo_root)
     term_width = shutil.get_terminal_size((80, 24)).columns
     W = min(78, max(68, term_width - 2))
     inner_w = W - 2
 
     is_plain = plain_mode or (term_width < 68) or (not sys.stdout.isatty())
     menu_str = render_model_menu(models, inner_w=inner_w, plain=is_plain)
-    aliases = build_menu_aliases(models, best_model_name)
+    aliases = build_menu_aliases(models, best_standard_name, best_light_name)
 
     print(menu_str)
     num_models = len(models)
     prompt_msg = (
         f"\n{BOLD}Select model [1-{num_models}] or name "
-        f"(default: 1 [{best_model_name}], 'q' to quit): {RESET}"
+        f"(default: 1 [{best_standard_name}], 'q' to quit): {RESET}"
     )
 
     while True:
@@ -685,6 +795,11 @@ def main() -> None:
         help="Model bundle name to use (bypasses interactive selection menu)",
     )
     parser.add_argument(
+        "--reduced",
+        action="store_true",
+        help="Use the optimal reduced feature model (5 subcarriers / 20 features) from minimization experiment",
+    )
+    parser.add_argument(
         "--no-menu",
         action="store_true",
         help="Skip interactive model selection menu and use best/default model",
@@ -725,12 +840,28 @@ def main() -> None:
     # Locate repo root
     repo_root = Path(__file__).resolve().parent.parent
 
+    # Discover models and aliases
+    models, best_standard_name, best_light_name = discover_available_models(repo_root)
+    aliases = build_menu_aliases(models, best_standard_name, best_light_name)
+
     # Determine inference model (via CLI argument, non-interactive fallback, or interactive menu)
-    if args.model:
-        selected_model = args.model
+    if args.reduced:
+        if args.model:
+            model_query = args.model.lower().strip()
+            mapped = aliases.get(model_query, model_query)
+            if mapped in ["mlp", "svm", "random_forest", "gradient_boosting"]:
+                selected_model = f"{mapped}_light"
+            elif mapped.endswith("_light"):
+                selected_model = mapped
+            else:
+                selected_model = f"{mapped}_light"
+        else:
+            selected_model = best_light_name
+    elif args.model:
+        model_query = args.model.lower().strip()
+        selected_model = aliases.get(model_query, args.model)
     elif args.no_menu or not sys.stdin.isatty():
-        _, best_model_name = discover_available_models(repo_root)
-        selected_model = best_model_name
+        selected_model = best_standard_name
         if not args.no_menu:
             print(
                 f"{DIM}Non-interactive terminal detected. Auto-selected default model: {BOLD}{selected_model}{RESET}"
