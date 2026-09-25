@@ -2,6 +2,8 @@
 """Real-time Wi-Fi CSI Presence Detection live monitor."""
 
 import argparse
+import json
+import re
 import shutil
 import sys
 import time
@@ -58,7 +60,6 @@ MAX_HISTORY = 10  # Number of recent predictions to display in the timeline
 
 
 class TerminalDashboard:
-
     """Renders a live, flicker-free terminal dashboard for CSI presence detection."""
 
     def __init__(
@@ -109,7 +110,9 @@ class TerminalDashboard:
             span = res.get("time_span", 0.0)
             rate = res.get("packet_rate_hz", 0.0)
             mode = self.engine.window_mode.upper()
-            print(f"[{now_str}] BUFFERING ({mode}): {count}/{target} packets ({span:.1f}/2.0s, {rate:4.1f} Hz)")
+            print(
+                f"[{now_str}] BUFFERING ({mode}): {count}/{target} packets ({span:.1f}/2.0s, {rate:4.1f} Hz)"
+            )
         else:
             label = res["label"].upper()
             p_occ = res["prob_occupied"] * 100.0
@@ -151,9 +154,7 @@ class TerminalDashboard:
             f"{FG_CYAN}║{BOLD}{FG_BRIGHT_WHITE}{header_title:^{inner_w}}{RESET}{FG_CYAN}║{RESET}"
         )
         model_info = f"Model: {self.engine.model_name.upper()}  │  Window: {self.engine.window_seconds:.1f}s ({mode_str})  │  Port: {self.engine.port}"
-        lines.append(
-            f"{FG_CYAN}║{DIM}{FG_WHITE}{model_info:^{inner_w}}{RESET}{FG_CYAN}║{RESET}"
-        )
+        lines.append(f"{FG_CYAN}║{DIM}{FG_WHITE}{model_info:^{inner_w}}{RESET}{FG_CYAN}║{RESET}")
         lines.append(f"{FG_CYAN}╠{'═' * inner_w}╣{RESET}")
 
         # ── Primary Status Banner ───────────────────────────────────────────
@@ -252,7 +253,9 @@ class TerminalDashboard:
         lines.append(
             f"{FG_CYAN}║  {BOLD}{FG_BRIGHT_WHITE}TELEMETRY & HARDWARE HEALTH:{' ' * (inner_w - 30)}║{RESET}"
         )
-        rate_color = FG_BRIGHT_GREEN if rate_hz >= 25.0 else (FG_YELLOW if rate_hz > 5.0 else FG_RED)
+        rate_color = (
+            FG_BRIGHT_GREEN if rate_hz >= 25.0 else (FG_YELLOW if rate_hz > 5.0 else FG_RED)
+        )
         rssi_str = f"{rssi:.0f} dBm" if rssi is not None else "--"
         noise_str = f"{noise:.0f} dBm" if noise is not None else "--"
         snr_str = f"+{snr:.0f} dB" if snr is not None else "--"
@@ -271,7 +274,6 @@ class TerminalDashboard:
         pad3 = inner_w - len(t_line3)
         lines.append(f"{FG_CYAN}║{t_line3}{' ' * max(0, pad3)}{FG_CYAN}║{RESET}")
         lines.append(f"{FG_CYAN}╠{'─' * inner_w}╣{RESET}")
-
 
         # ── Recent Predictions Log (Timeline) ────────────────────────────────
         lines.append(
@@ -293,7 +295,11 @@ class TerminalDashboard:
                 p_c = item["prob_occupied"] * 100.0
                 p_e = item["prob_empty"] * 100.0
                 tag_col = FG_BRIGHT_RED if pred_label == "OCCUPIED" else FG_BRIGHT_GREEN
-                rssi_ev = f"{item.get('rssi', '--'):>3.0f} dBm" if item.get("rssi") is not None else "  -- dBm"
+                rssi_ev = (
+                    f"{item.get('rssi', '--'):>3.0f} dBm"
+                    if item.get("rssi") is not None
+                    else "  -- dBm"
+                )
                 row = (
                     f"  {DIM}{t_event}{RESET}  [{tag_col}{pred_label:^8s}{RESET}] "
                     f"P(Occ)={p_c:5.1f}%  P(Emp)={p_e:5.1f}% │ {rssi_ev} │ {item['sample_count']} pkts"
@@ -305,8 +311,14 @@ class TerminalDashboard:
 
         # ── Footer / Run Stats ───────────────────────────────────────────────
         total_inf = max(1, self.engine.total_inferences)
-        occ_pct = (self.engine.occupied_count / total_inf) * 100.0 if self.engine.total_inferences else 0.0
-        emp_pct = (self.engine.empty_count / total_inf) * 100.0 if self.engine.total_inferences else 0.0
+        occ_pct = (
+            (self.engine.occupied_count / total_inf) * 100.0
+            if self.engine.total_inferences
+            else 0.0
+        )
+        emp_pct = (
+            (self.engine.empty_count / total_inf) * 100.0 if self.engine.total_inferences else 0.0
+        )
 
         footer = (
             f"Elapsed: {elapsed_str} │ Inferences: {self.engine.total_inferences} │ "
@@ -331,25 +343,322 @@ class TerminalDashboard:
 
         duration = time.time() - self.start_time
         total_inf = self.engine.total_inferences
-        print(f"{BOLD}{FG_CYAN}═══════════════════════════════════════════════════════════════{RESET}")
+        print(
+            f"{BOLD}{FG_CYAN}═══════════════════════════════════════════════════════════════{RESET}"
+        )
         print(f"{BOLD}  WI-FI CSI REAL-TIME PRESENCE SESSION SUMMARY{RESET}")
-        print(f"{BOLD}{FG_CYAN}═══════════════════════════════════════════════════════════════{RESET}")
+        print(
+            f"{BOLD}{FG_CYAN}═══════════════════════════════════════════════════════════════{RESET}"
+        )
         print(f"  Duration           : {format_duration(duration)} ({duration:.1f} s)")
         print(f"  Model Used         : {self.engine.model_name.upper()} (Optimal pipeline)")
         print(f"  Serial Port        : {self.engine.port} @ {self.engine.baudrate} bps")
         print(f"  Packets Received   : {self.engine.total_packets_received:,}")
-        print(f"  Average Rate       : {(self.engine.total_packets_received / max(0.1, duration)):.1f} Hz")
+        print(
+            f"  Average Rate       : {(self.engine.total_packets_received / max(0.1, duration)):.1f} Hz"
+        )
         print(f"  Total Inferences   : {total_inf:,}")
         if total_inf > 0:
             occ_ratio = (self.engine.occupied_count / total_inf) * 100.0
             emp_ratio = (self.engine.empty_count / total_inf) * 100.0
-            print(
-                f"  Empty Predictions  : {self.engine.empty_count:5d} ({emp_ratio:5.1f}%)"
+            print(f"  Empty Predictions  : {self.engine.empty_count:5d} ({emp_ratio:5.1f}%)")
+            print(f"  Occupied Predictions: {self.engine.occupied_count:5d} ({occ_ratio:5.1f}%)")
+        print(
+            f"{BOLD}{FG_CYAN}═══════════════════════════════════════════════════════════════{RESET}\n"
+        )
+
+
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+
+
+def strip_ansi(text: str) -> str:
+    """Strip ANSI escape sequences from string for accurate length calculation."""
+    return ANSI_ESCAPE_RE.sub("", text)
+
+
+def format_box_line(text_with_ansi: str, inner_width: int) -> str:
+    """Format a line padded with spaces inside double vertical cyan borders."""
+    plain_len = len(strip_ansi(text_with_ansi))
+    if plain_len > inner_width:
+        text_with_ansi = text_with_ansi[: inner_width - 3] + "..."
+        plain_len = len(strip_ansi(text_with_ansi))
+    pad = max(0, inner_width - plain_len)
+    return f"{FG_CYAN}║{RESET}{text_with_ansi}{' ' * pad}{FG_CYAN}║{RESET}"
+
+
+def _summarize_architecture(classifier_class: str, params: dict[str, Any]) -> str:
+    """Generate concise human-readable summary of classifier architecture."""
+    if classifier_class == "MLPClassifier":
+        layers = params.get("hidden_layer_sizes", [50, 50])
+        solver = params.get("solver", "adam")
+        return f"MLP (layers: {layers}, solver: {solver})"
+    elif classifier_class == "RandomForestClassifier":
+        n_est = params.get("n_estimators", 100)
+        max_d = params.get("max_depth", None)
+        return f"RandomForest ({n_est} trees, max_depth: {max_d})"
+    elif classifier_class == "GradientBoostingClassifier":
+        n_est = params.get("n_estimators", 100)
+        lr = params.get("learning_rate", 0.1)
+        max_d = params.get("max_depth", 3)
+        return f"GradientBoosting ({n_est} trees, lr: {lr}, depth: {max_d})"
+    elif classifier_class == "SVC":
+        kernel = params.get("kernel", "rbf")
+        c = params.get("C", 10.0)
+        return f"SVC ({kernel.upper()} kernel, C: {c})"
+    return classifier_class or "Scikit-Learn Pipeline"
+
+
+def discover_available_models(repo_root: Path) -> tuple[list[dict[str, Any]], str]:
+    """Discover registered model bundles and offline evaluation metrics.
+
+    Returns
+    -------
+    models : list of dict
+        Discovered models with metadata and metrics, sorted with the recommended model first.
+    best_model_name : str
+        Identifier of the top performing / recommended model.
+    """
+    registry_dir = repo_root / "models/registry"
+    eval_report_file = repo_root / "reports/logs/evaluation_report.json"
+
+    # 1. Load evaluation report for offline metrics & best model identification
+    eval_metrics: dict[str, dict[str, Any]] = {}
+    best_model_name = "mlp"
+
+    if eval_report_file.exists():
+        try:
+            with open(eval_report_file, "r", encoding="utf-8") as f:
+                eval_data = json.load(f)
+                best_model_name = eval_data.get("best_model", "mlp")
+                for item in eval_data.get("validation", []):
+                    m_name = item.get("model")
+                    if m_name:
+                        eval_metrics[m_name] = item
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # 2. Discover model bundles from registry
+    found_bundles: list[Path] = []
+    if registry_dir.exists():
+        found_bundles = sorted(
+            [p for p in registry_dir.glob("*_bundle") if p.is_dir()],
+            key=lambda p: p.name,
+        )
+
+    models: list[dict[str, Any]] = []
+
+    friendly_names: dict[str, str] = {
+        "mlp": "Multi-Layer Perceptron (MLP)",
+        "random_forest": "Random Forest",
+        "gradient_boosting": "Gradient Boosting (GBDT)",
+        "svm": "Support Vector Machine (SVM)",
+    }
+
+    if found_bundles:
+        for b_dir in found_bundles:
+            m_key = b_dir.name.removesuffix("_bundle")
+            card_file = b_dir / "model_card.json"
+            card_data: dict[str, Any] = {}
+            if card_file.exists():
+                try:
+                    with open(card_file, "r", encoding="utf-8") as f:
+                        card_data = json.load(f)
+                except (json.JSONDecodeError, OSError):
+                    pass
+
+            c_class = card_data.get("classifier_class", "")
+            c_params = card_data.get("classifier_params", {})
+            m_metrics = eval_metrics.get(m_key, {})
+            is_best = m_key == best_model_name
+
+            models.append(
+                {
+                    "key": m_key,
+                    "bundle_name": b_dir.name,
+                    "display_name": friendly_names.get(m_key, m_key.replace("_", " ").title()),
+                    "classifier_class": c_class,
+                    "arch_summary": _summarize_architecture(c_class, c_params),
+                    "is_best": is_best,
+                    "accuracy": m_metrics.get("accuracy"),
+                    "f1_macro": m_metrics.get("f1_macro"),
+                    "false_alarm_rate": m_metrics.get("false_alarm_rate"),
+                }
             )
-            print(
-                f"  Occupied Predictions: {self.engine.occupied_count:5d} ({occ_ratio:5.1f}%)"
+    else:
+        # Fallback to standard models if registry is empty
+        for m_key, disp in friendly_names.items():
+            m_metrics = eval_metrics.get(m_key, {})
+            is_best = m_key == best_model_name
+            models.append(
+                {
+                    "key": m_key,
+                    "bundle_name": f"{m_key}_bundle",
+                    "display_name": disp,
+                    "classifier_class": "",
+                    "arch_summary": "",
+                    "is_best": is_best,
+                    "accuracy": m_metrics.get("accuracy"),
+                    "f1_macro": m_metrics.get("f1_macro"),
+                    "false_alarm_rate": m_metrics.get("false_alarm_rate"),
+                }
             )
-        print(f"{BOLD}{FG_CYAN}═══════════════════════════════════════════════════════════════{RESET}\n")
+
+    # 3. Sort models: Best/recommended model first, then by F1 score descending, then FAR ascending
+    def sort_key(item: dict[str, Any]) -> tuple[int, float, float]:
+        is_rec = 1 if item["is_best"] else 0
+        f1 = float(item["f1_macro"]) if item.get("f1_macro") is not None else 0.0
+        far = float(item["false_alarm_rate"]) if item.get("false_alarm_rate") is not None else 1.0
+        return (-is_rec, -f1, far)
+
+    models.sort(key=sort_key)
+    return models, best_model_name
+
+
+def build_menu_aliases(models: list[dict[str, Any]], best_model_name: str) -> dict[str, str]:
+    """Build input mapping supporting index, name, abbreviations, and shortcuts."""
+    aliases: dict[str, str] = {
+        "": best_model_name,
+        "default": best_model_name,
+    }
+    short_aliases: dict[str, list[str]] = {
+        "mlp": ["mlp", "nn", "neural"],
+        "random_forest": ["rf", "forest", "randomforest", "random_forest"],
+        "gradient_boosting": ["gb", "gbdt", "boost", "gradient_boosting", "gradientboosting"],
+        "svm": ["svm", "svc", "support_vector_machine"],
+    }
+    for idx, item in enumerate(models, start=1):
+        key = item["key"]
+        aliases[str(idx)] = key
+        aliases[key.lower()] = key
+        aliases[key.lower().replace("_", "")] = key
+        aliases[key.lower().replace("_", " ")] = key
+        for short in short_aliases.get(key, []):
+            aliases[short] = key
+
+    return aliases
+
+
+def render_model_menu(models: list[dict[str, Any]], inner_w: int = 74, plain: bool = False) -> str:
+    """Render interactive model selection box with ANSI colors or plain text."""
+    if plain:
+        lines: list[str] = [
+            "=" * 72,
+            "  WI-FI CSI REAL-TIME PRESENCE DETECTION - MODEL SELECTION",
+            "=" * 72,
+            "",
+            "Select a trained model pipeline for real-time inference:",
+            "",
+        ]
+        for idx, item in enumerate(models, start=1):
+            disp = item["display_name"]
+            key = item["key"]
+            is_best = item["is_best"]
+            arch = item.get("arch_summary")
+            f1 = item.get("f1_macro")
+            acc = item.get("accuracy")
+            far = item.get("false_alarm_rate")
+
+            best_tag = " [RECOMMENDED / BEST]" if is_best else ""
+            lines.append(f"  [{idx}] {disp} ({key}){best_tag}")
+            if arch:
+                lines.append(f"      Architecture : {arch}")
+            if f1 is not None and acc is not None:
+                far_str = f"{far * 100:.2f}%" if far is not None else "--"
+                lines.append(
+                    f"      Val Metrics  : F1: {f1 * 100:.2f}% | Acc: {acc * 100:.2f}% | FAR: {far_str}"
+                )
+            lines.append("")
+        lines.append("=" * 72)
+        return "\n".join(lines)
+
+    lines = []
+    lines.append(f"{FG_CYAN}╔{'═' * inner_w}╗{RESET}")
+    title = "WI-FI CSI REAL-TIME PRESENCE DETECTION"
+    subtitle = "MODEL SELECTION MENU"
+    lines.append(format_box_line(f"{BOLD}{FG_BRIGHT_WHITE}{title:^{inner_w}}{RESET}", inner_w))
+    lines.append(format_box_line(f"{DIM}{FG_BRIGHT_CYAN}{subtitle:^{inner_w}}{RESET}", inner_w))
+    lines.append(f"{FG_CYAN}╠{'═' * inner_w}╣{RESET}")
+    lines.append(format_box_line("", inner_w))
+    lines.append(
+        format_box_line(
+            f"  {BOLD}{FG_WHITE}Select a trained model pipeline for real-time inference:{RESET}",
+            inner_w,
+        )
+    )
+    lines.append(format_box_line("", inner_w))
+
+    for idx, item in enumerate(models, start=1):
+        disp = item["display_name"]
+        key = item["key"]
+        is_best = item["is_best"]
+        arch = item.get("arch_summary")
+        f1 = item.get("f1_macro")
+        acc = item.get("accuracy")
+        far = item.get("false_alarm_rate")
+
+        best_badge = f" {BOLD}{FG_BRIGHT_YELLOW}[RECOMMENDED / BEST]{RESET}" if is_best else ""
+        line1 = f"  {BOLD}{FG_BRIGHT_CYAN}[{idx}]{RESET} {BOLD}{FG_BRIGHT_WHITE}{disp}{RESET} {DIM}({key}){RESET}{best_badge}"
+        lines.append(format_box_line(line1, inner_w))
+
+        if arch:
+            line2 = f"      {DIM}{FG_GRAY}Architecture : {arch}{RESET}"
+            lines.append(format_box_line(line2, inner_w))
+
+        if f1 is not None and acc is not None:
+            far_str = f"{far * 100:.2f}%" if far is not None else "--"
+            metrics_str = f"F1: {f1 * 100:.2f}% │ Acc: {acc * 100:.2f}% │ FAR: {far_str}"
+            line3 = f"      {FG_GREEN}Val Metrics  : {metrics_str}{RESET}"
+            lines.append(format_box_line(line3, inner_w))
+
+        lines.append(format_box_line("", inner_w))
+
+    lines.append(f"{FG_CYAN}╚{'═' * inner_w}╝{RESET}")
+    return "\n".join(lines)
+
+
+def prompt_model_selection(repo_root: Path, plain_mode: bool = False) -> str:
+    """Display interactive menu and prompt user to select a model.
+
+    Returns
+    -------
+    str
+        The selected model bundle name (e.g. 'mlp', 'random_forest').
+    """
+    models, best_model_name = discover_available_models(repo_root)
+    term_width = shutil.get_terminal_size((80, 24)).columns
+    W = min(78, max(68, term_width - 2))
+    inner_w = W - 2
+
+    is_plain = plain_mode or (term_width < 68) or (not sys.stdout.isatty())
+    menu_str = render_model_menu(models, inner_w=inner_w, plain=is_plain)
+    aliases = build_menu_aliases(models, best_model_name)
+
+    print(menu_str)
+    num_models = len(models)
+    prompt_msg = (
+        f"\n{BOLD}Select model [1-{num_models}] or name "
+        f"(default: 1 [{best_model_name}], 'q' to quit): {RESET}"
+    )
+
+    while True:
+        try:
+            raw_input_val = input(prompt_msg).strip()
+        except (KeyboardInterrupt, EOFError):
+            print(f"\n\n{DIM}Model selection aborted. Exiting.{RESET}")
+            sys.exit(0)
+
+        cleaned = raw_input_val.lower()
+        if cleaned in ["q", "quit", "exit"]:
+            print(f"\n{DIM}Exiting on user request.{RESET}")
+            sys.exit(0)
+
+        if cleaned in aliases:
+            return aliases[cleaned]
+
+        print(
+            f"{BOLD}{FG_RED}[!] Invalid choice '{raw_input_val}'. "
+            f"Please enter a number between 1 and {num_models}, a model name, or press Enter for default.{RESET}"
+        )
 
 
 def main() -> None:
@@ -373,7 +682,12 @@ def main() -> None:
         "--model",
         type=str,
         default=None,
-        help="Model bundle name to use (default: best model from evaluation_report.json)",
+        help="Model bundle name to use (bypasses interactive selection menu)",
+    )
+    parser.add_argument(
+        "--no-menu",
+        action="store_true",
+        help="Skip interactive model selection menu and use best/default model",
     )
     parser.add_argument(
         "--window",
@@ -411,11 +725,27 @@ def main() -> None:
     # Locate repo root
     repo_root = Path(__file__).resolve().parent.parent
 
+    # Determine inference model (via CLI argument, non-interactive fallback, or interactive menu)
+    if args.model:
+        selected_model = args.model
+    elif args.no_menu or not sys.stdin.isatty():
+        _, best_model_name = discover_available_models(repo_root)
+        selected_model = best_model_name
+        if not args.no_menu:
+            print(
+                f"{DIM}Non-interactive terminal detected. Auto-selected default model: {BOLD}{selected_model}{RESET}"
+            )
+    else:
+        selected_model = prompt_model_selection(repo_root, plain_mode=args.plain)
+
+    print(f"\n{BOLD}{FG_GREEN}✔ Model selected:{RESET} {BOLD}{selected_model}{RESET}")
+    print(f"{DIM}Initializing real-time acquisition engine...{RESET}\n")
+
     try:
         engine = RealtimeCSIInference(
             port=None if args.port == "auto" else args.port,
             baudrate=args.baud,
-            model_name= args.model,
+            model_name=selected_model,
             window_seconds=args.window,
             window_mode=args.mode,
             threshold=args.threshold,
@@ -426,13 +756,10 @@ def main() -> None:
             refresh_rate_hz=args.rate,
             plain_mode=args.plain,
         )
+        dashboard.run()
     except Exception as e:  # noqa: BLE001
-        print(f"\n{BOLD}{FG_RED}[ERROR] Failed to initialize real-time engine:{RESET} {e}")
+        print(f"\n{BOLD}{FG_RED}[ERROR] Failed to run real-time engine:{RESET} {e}")
         sys.exit(1)
-
-
-
-    dashboard.run()
 
 
 if __name__ == "__main__":
