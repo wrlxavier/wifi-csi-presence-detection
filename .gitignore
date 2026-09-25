@@ -243,6 +243,10 @@ outputs/**/*.jpeg
 outputs/**/*.svg
 outputs/**/*.pdf
 
+# Compressed backup archives
+outputs/backups/*.zip
+outputs/**/*.zip
+
 # Trained models and registry
 models/*.pkl
 models/*.joblib

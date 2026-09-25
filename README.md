@@ -65,11 +65,18 @@ wifi-csi-presence-detection/
 │   ├── 02_pipeline/                    # pipeline_v0.ipynb, pipeline_v1.ipynb (features & filtering)
 │   ├── 03_analysis/                    # separability_figures.ipynb, separability_lda.ipynb
 │   └── 04_modeling/                    # 01_split.ipynb to 05_robustness.ipynb (training & evaluation)
+├── outputs/                            # Diagnostic figures, artifacts, and backups
+│   ├── backups/                        # Backup archives (.gitkeep, ignored .zip archives)
+│   ├── first_test/                     # Exploratory campaign plots
+│   ├── main/                           # Main campaign plots
+│   ├── pilot/                          # Pilot campaign plots & figures
+│   └── pipeline_v1/                    # Pipeline v1 figures & evaluation artifacts
 ├── reports/                            # Publication & thesis assets
 │   ├── figures/                        # High-resolution PNG and vector PDF plots
 │   ├── tables/                         # LaTeX (.tex) and CSV tables for thesis
 │   └── logs/                           # Automated pipeline & evaluation JSON logs
-├── scripts/                            # Real-time live inference tools
+├── scripts/                            # Automation & live inference tools
+│   ├── backup_data.py                  # Compress and restore untracked/ignored project data
 │   └── realtime_presence.py            # Live real-time CSI presence detection monitor
 ├── src/                                # Installable Python package (uv pip install -e .)
 │   ├── wifi_csi/                       # Core modular package
@@ -128,6 +135,30 @@ To launch the live system monitoring and presence detection interface with the E
 make live
 # or directly: uv run python scripts/realtime_presence.py
 ```
+
+### 5. Data Backup & Recovery (Untracked Assets)
+
+Large raw datasets, model pickles, reports, and generated images are excluded from Git via `.gitignore`. You can create and restore self-contained `.zip` backup archives stored in `outputs/backups/`:
+
+```bash
+# Compress all untracked data/models/reports into a timestamped zip in outputs/backups/
+make compress
+# or directly: uv run python scripts/backup_data.py compress
+
+# Compress with a custom archive name
+make compress ARCHIVE=my_backup.zip
+# or directly: uv run python scripts/backup_data.py compress --file my_backup.zip
+
+# Restore from the latest archive in outputs/backups/ and validate file structure
+make restore
+# or directly: uv run python scripts/backup_data.py restore
+
+# Restore a specific archive version
+make restore ARCHIVE=my_backup.zip
+# or directly: uv run python scripts/backup_data.py restore --file my_backup.zip
+```
+
+The restoration process verifies archive integrity (CRC-32), extracts files to their original repository paths, and validates that all expected project components (`data/01_raw/`, `data/03_processed/splits/`, `models/`, `outputs/`, `reports/`) are present and intact.
 
 ## Hardware
 
