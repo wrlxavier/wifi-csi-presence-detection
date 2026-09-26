@@ -79,16 +79,16 @@ The testbed adopts a 2D Cartesian coordinate frame $(x, y)$ with its origin $(0,
 
 ```text
                         North Wall
-  (0.0, 0.0) ┌─────────────────────────┐       (3.40, 0.0)
-             │                         │     
- Plywood Door│        [RX Node]        │    
-             │        (1.45, 1.14)     └─────┐
-             │             │                 │
-             │             │                 │
-  West Wall  │             │ 2.00 m LoS      │ East Wall
-             │             │                 │
-             │        [TX Node]              │
-             │        (1.45, 3.08)           │
+  (0.0, 0.0) ┌───────────────────────────────┐ (3.40, 0.0)
+             │                               │
+ Plywood Door│           [RX Node]           │┌─────────────┐
+             │          (1.45, 1.14)         ││ Mirrored    │
+             │               │               ││ Wardrobe    │
+             │               │               ││ (East Wall) │
+  West Wall  │               │ 2.00 m LoS    │└─────────────┘
+             │               │               │   East Wall
+             │           [TX Node]           │
+             │          (1.45, 3.08)         │
              │                               │
   (0.0, 3.45)└───────────────────────────────┘ (3.40, 3.45)
                South Wall (Iron & Glass Window)
@@ -309,9 +309,9 @@ To evaluate model generalizability and prevent classifiers from keying on a sing
   │ [P1: West] ──── [Center Mark] ──── [P4: East]   │
   │ (1.15, 2.11)    (1.45, 2.11)       (1.75, 2.11) │
   │                      │                          │
-  │                      │ 30 cm                    │
-  │                 [P2: Near TX] (1.45, 2.78)      │
   │                      │                          │
+  │                 [P2: Near TX] (1.45, 2.78)      │
+  │                      │ 30 cm                    │
   │                  [TX Node]                      │
   │                 (1.45, 3.08)                    │
   │                                                 │
@@ -539,7 +539,7 @@ The seven sessions of the main campaign (`G` to `M`) serve as the core dataset f
 1. **Packet Loss Ceiling ($< 5.0\%$):** Achieved $< 0.18\%$ packet loss across all main sessions ($0.01\%$ in sessions L and M; $0.03\%$ in session G; $0.07\%$ in sessions J and K; $0.18\%$ in sessions H and I).
 2. **Effective Sampling Rate ($\pm 10\%$ of nominal $30\text{ Hz}$):** All sessions exhibited effective rates between $28.86\text{ Hz}$ and $29.33\text{ Hz}$ (well within the $27.0 - 33.0\text{ Hz}$ acceptance band).
 3. **Inter-Packet Arrival Jitter:** Standard deviation of inter-packet intervals ($\sigma_{\Delta t}$) remained between $3.93\text{ ms}$ and $5.79\text{ ms}$, confirming stable packet generation without buffer stalls.
-4. **Valid Subcarrier Yield ($\ge 40$ valid carriers):** Each session yielded 165 or 166 valid subcarriers with mean amplitude $> 0.5$ (out of 192 total raw subcarriers). Across all ingested sessions, 162 subcarriers were mutually valid.
+4. **Valid Subcarrier Yield ($\ge 40$ valid carriers):** Each session yielded 165 or 166 valid subcarriers with mean amplitude $> 0.5$ (out of 192 total raw subcarriers). Across all seven main sessions in [`eda_main.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_main.ipynb), 165 subcarriers were mutually valid (with the downstream Stage 2 pipeline retaining a 162-subcarrier shared mask when intersecting across both Pilot C–F and Main G–M).
 
 | Session ID | Label Name | Duration (s) | Ingested Frames | Effective Rate (Hz) | Median Rate (Hz) | Jitter $\sigma_{\Delta t}$ (ms) | RSSI Mean (dBm) | RSSI Std (dBm) | Valid Subcarriers | Quality Status |
 | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -568,7 +568,7 @@ Comparing the empirical metrics across spatial positions highlights why CSI is r
 
 The data acquisition stage delivers several technical foundations for the remainder of the capstone project:
 
-1. **Physical Soundness:** The acquisition setup relies on calibrated, reproducible hardware geometry and verified RF physical layer parameters. Operating in 802.11n HT40 mode yields 192 raw subcarriers (162 valid active subcarriers after DC/null masking), providing the spectral resolution required for statistical dispersion modeling.
+1. **Physical Soundness:** The acquisition setup relies on calibrated, reproducible hardware geometry and verified RF physical layer parameters. Operating in 802.11n HT40 mode yields 192 raw subcarriers (165 shared valid subcarriers across the main campaign, and 162 across the combined pilot and main pipeline after DC/null masking), providing the spectral resolution required for statistical dispersion modeling.
 2. **Deterministic Data Ingestion:** By embedding timing landmarks ($t_0, t_1, t_2, t_3$) within machine-readable sidecar metadata files, the downstream preprocessing pipeline can programmatically isolate the steady-state active condition window, eliminating human entry/exit artifacts without manual clipping.
 3. **Data Hygiene & Protocol Enforcement:** The automated validation protocol ensures that only sessions verified against objective transmission criteria (packet loss $< 5\%$, effective rate within $\pm 10\%$, no protocol interruptions) enter the dataset.
 4. **Spatial Generalization Baseline:** By including on-LoS, off-LoS, near-TX, near-RX, still, moving, and extended empty recordings, the dataset provides the diversity necessary to evaluate model robustness and feature minimization without spatial overfitting.

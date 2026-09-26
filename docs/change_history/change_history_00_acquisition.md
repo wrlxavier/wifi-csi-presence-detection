@@ -55,3 +55,19 @@ The technical reference [`00_acquisition.md`](file:///home/xavier/dev/wifi-csi-p
 - **Updated Description:** 
   - Restored the complete `"labels_description"` dictionary inside `setup` matching the raw file on disk ([`session_G_empty_20260922_1701_meta.json`](file:///home/xavier/dev/wifi-csi-presence-detection/data/01_raw/main/session_G_empty_20260922_1701_meta.json)).
   - Added an explanatory callout note documenting the schema evolution from Schema v2.0 (host-absolute paths recorded before repository restructuring) to Schema v2.1 (portable relative paths generated via [`generate_session_metadata`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/acquisition/metadata_logger.py#L8-L65) for the generalization campaign).
+
+### 2.8 Spatial Diversity Diagram: Position P2 Distance Label Correction
+- **Sections Affected:** Section 6 (ASCII diagram, lines 309–317).
+- **Previous Description:** The label `30 cm` was positioned vertically between `[Center Mark]` $(1.45, 2.11)\text{ m}$ and `[P2: Near TX]` $(1.45, 2.78)\text{ m}$, incorrectly implying that P2 was 30 cm from the Center Mark.
+- **Updated Description:** Relocated the `30 cm` label to span between `[P2: Near TX]` and `[TX Node]` $(1.45, 3.08)\text{ m}$, correctly illustrating that P2 represents standing $30\text{ cm}$ in front of the transmitter node ($3.08 - 2.78 = 0.30\text{ m}$), matching Table 6.1 and the ground-truth metadata specifications.
+
+### 2.9 Mutual Valid Subcarrier Count Scope Clarification (165 vs. 162)
+- **Sections Affected:** Section 9.3 (Item 4), Section 10 (Item 1).
+- **Previous Description:** Stated that *"Across all ingested sessions, 162 subcarriers were mutually valid"* within Section 9.3 (which reports on the Main Campaign EDA in `eda_main.ipynb`), and universally cited 162 valid active subcarriers in Section 10.
+- **Updated Description:** Clarified that across the 7 Main Campaign sessions (`G` through `M`) analyzed in [`eda_main.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_main.ipynb), **165 subcarriers** were mutually valid ($165 / 192$). Clarified that **162 subcarriers** represents the shared valid mask intersection calculated in the downstream Stage 2 pipeline across both Pilot (C–F) and Main (G–M) campaigns after discarding 30 dead/null carriers.
+
+### 2.10 Bedroom Floorplan Geometry & Interior Wardrobe Rendering
+- **Sections Affected:** Section 2.3 (ASCII diagram, lines 81–94).
+- **Previous Description:** The top wall boundary ended early at column 39 with a stepped indentation at line 85 (`└─────┐`), creating the false visual impression of an L-shaped exterior wall boundary.
+- **Updated Description:** Re-rendered the room perimeter as a regular closed rectangle ($3.40\text{ m} \times 3.45\text{ m}$, area $11.73\text{ m}^2$) matching the physical specifications, and explicitly depicted the mirrored wardrobe as an interior furniture feature positioned along the East wall.
+
