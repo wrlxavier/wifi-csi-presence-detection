@@ -128,7 +128,7 @@ The link operates under fixed physical layer modulation parameters to ensure tha
 
 ### 3.3 OFDM Subcarrier Structure
 
-In an 802.11n HT40 channel, the physical layer bonds two adjacent 20 MHz channels into a 40 MHz channel utilizing a 128-point Fast Fourier Transform (FFT) with subcarrier spacing $\Delta f = 312.5\text{ kHz}$ ($128 \times 312.5\text{ kHz} = 40.0\text{ MHz}$). While the standard 802.11n HT40 mask defines 114 data subcarriers and 6 pilot subcarriers (120 occupied subcarriers), the Espressif ESP32-S3 baseband engine extracts and reports an extended spectrum of $N_{\text{sub}} = 192$ complex subcarrier coefficients per received frame (`HT40_N_SUBCARRIERS = 192` in [`constants.py`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/core/constants.py#L3)):
+In an 802.11n HT40 channel, the physical layer bonds two adjacent 20 MHz channels into a 40 MHz channel utilizing a 128-point Fast Fourier Transform (FFT) with subcarrier spacing $\Delta f = 312.5\text{ kHz}$ ($128 \times 312.5\text{ kHz} = 40.0\text{ MHz}$). While the standard 802.11n HT40 mask defines 108 data subcarriers and 6 pilot subcarriers (114 occupied subcarriers), the Espressif ESP32-S3 baseband engine extracts and reports an extended spectrum of $N_{\text{sub}} = 192$ complex subcarrier coefficients per received frame (`HT40_N_SUBCARRIERS = 192` in [`constants.py`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/core/constants.py#L3)):
 
 - **Subcarrier Spacing:** $\Delta f = 312.5\text{ kHz}$.
 - **Reported Subcarrier Bins:** 192 complex bins representing the bonded 40 MHz channel response along with adjacent baseband transition bands.
@@ -475,8 +475,8 @@ wifi-csi-presence-detection/
 
 The acquisition stage was conducted across four distinct experimental campaigns:
 
-1. **First Test Campaign (April 2026):** Initial feasibility trial using 802.11n HT20 mode on Channel 6 ($20\text{ MHz}$ bandwidth). Validated the serial capture architecture, baud rate stability, and basic complex I/Q decoding over two 60-second sessions (`PLA` and `PLB`).
-2. **Pilot Campaign (May 2026):** Transitioned to 802.11n HT40 mode on Channel 11 ($40\text{ MHz}$ bandwidth). Six sessions (`A` through `F`) were logged. Established the four-phase timing protocol and demonstrated that direct center-mark obstruction was readily detectable. Revealed that sessions A and B suffered from manual timing entry issues, motivating full automation in v2.
+1. **First Test Campaign (April 2026):** Initial feasibility trial using 802.11n HT40 mode on Channel 11 ($40\text{ MHz}$ bandwidth), identical to all subsequent campaigns. Validated the serial capture architecture, baud rate stability, and basic complex I/Q decoding over two 60-second sessions (`PLA` and `PLB`). The companion metadata files contain manually entered setup parameters (channel 6, HT20) that do not match the actual PHY frame headers captured in the raw data, which confirm HT40 operation on Channel 11 with 192 complex subcarriers per frame.
+2. **Pilot Campaign (May 2026):** Continued operating on 802.11n HT40 mode on Channel 11 ($40\text{ MHz}$ bandwidth) with extended 690-second sessions. Six sessions (`A` through `F`) were logged. Established the four-phase timing protocol and demonstrated that direct center-mark obstruction was readily detectable. Revealed that sessions A and B suffered from manual timing entry issues, motivating full automation in v2.
 3. **Main Benchmark Campaign (September 2026):** The primary benchmark dataset comprising seven sessions (`G` through `M`). Implemented full multi-position spatial coverage (`p1` to `p4`), collected $175,578\text{ raw CSI frames}$ across all seven sessions ($120,503\text{ frames}$ across the six standard 11.5-minute sessions plus $55,075\text{ frames}$ in the extended 31.5-minute Session J), and achieved a 100% session validation rate.
 4. **Generalization Campaign (September 2026):** Evaluated physical link scaling and spatial transferability across nine sessions (`GA` through `GI`) across four distinct inter-node distances ($2.0\text{ m}, 3.0\text{ m}, 4.0\text{ m}$, and $5.0\text{ m}$) in an outdoor covered patio environment.
 
@@ -486,8 +486,8 @@ The table below compiles all 24 acquisition sessions recorded in the repository:
 
 | Campaign | Session ID | Condition Label | PHY Mode | BW (MHz) | RF Ch. | Planned Dur. (s) | Total Samples | Status | Mean RSSI (dBm) | Invalidation Reason / Notes |
 | :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| `first_test` | **PLA** | `empty` | HT20 | 20 | 6 | 60 | 1,735 | **VALID** | -30.00 | Initial HT20 empty baseline trial |
-| `first_test` | **PLB** | `occupied_still` | HT20 | 20 | 6 | 60 | 1,736 | **VALID** | -42.85 | Initial HT20 occupied trial |
+| `first_test` | **PLA** | `empty` | HT40 | 40 | 11 | 60 | 1,735 | **VALID** | -30.00 | Initial HT40 empty baseline trial |
+| `first_test` | **PLB** | `occupied_still` | HT40 | 40 | 11 | 60 | 1,736 | **VALID** | -42.85 | Initial HT40 occupied trial |
 | `pilot` | **A** | `empty` | HT40 | 40 | 11 | 690 | 19,755 | **INVALID** | -33.19 | Timing mismatch: $t_1, t_2$ did not align with $t_0$ |
 | `pilot` | **B** | `empty` | HT40 | 40 | 11 | 690 | 19,715 | **INVALID** | -33.47 | Timing mismatch: $t_1$ did not align with $t_0$ |
 | `pilot` | **C** | `empty` | HT40 | 40 | 11 | 690 | 19,589 | **VALID** | -33.49 | Validated pilot empty baseline |
@@ -522,13 +522,13 @@ The seven sessions of the main campaign (`G` to `M`) serve as the core dataset f
 
 | Session ID | Label Name | Duration (s) | Ingested Frames | Effective Rate (Hz) | Median Rate (Hz) | Jitter $\sigma_{\Delta t}$ (ms) | RSSI Mean (dBm) | RSSI Std (dBm) | Valid Subcarriers | Quality Status |
 | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **G** | `empty` | 690.0 | 20,151 | 29.20 | 29.36 | 4.63 | -26.47 | 0.50 | 166 / 192 | **PASSED** |
-| **H** | `occupied_p1_still` | 690.0 | 19,984 | 28.96 | 29.36 | 5.28 | -26.49 | 0.66 | 166 / 192 | **PASSED** |
-| **I** | `occupied_p2_still` | 690.0 | 19,911 | 28.86 | 29.36 | 5.79 | -35.59 | 1.02 | 166 / 192 | **PASSED** |
-| **J** | `empty` (extended) | 1,889.9 | 55,075 | 29.14 | 29.36 | 4.59 | -27.00 | 0.03 | 166 / 192 | **PASSED** |
-| **K** | `occupied_p3_still` | 690.0 | 20,050 | 29.06 | 29.36 | 5.34 | -36.34 | 0.91 | 165 / 192 | **PASSED** |
-| **L** | `empty` | 690.0 | 20,236 | 29.33 | 29.36 | 3.93 | -27.13 | 0.33 | 166 / 192 | **PASSED** |
-| **M** | `occupied_p4_still` | 690.0 | 20,171 | 29.23 | 29.36 | 4.37 | -29.31 | 0.52 | 166 / 192 | **PASSED** |
+| **G** | `empty` | 690.0 | 20,151 | 29.20 | 29.38 | 4.63 | -26.47 | 0.50 | 166 / 192 | **PASSED** |
+| **H** | `occupied_p1_still` | 690.0 | 19,984 | 28.96 | 29.38 | 5.28 | -26.49 | 0.66 | 166 / 192 | **PASSED** |
+| **I** | `occupied_p2_still` | 690.0 | 19,911 | 28.86 | 29.42 | 5.79 | -35.59 | 1.02 | 166 / 192 | **PASSED** |
+| **J** | `empty` (extended) | 1,889.9 | 55,075 | 29.14 | 29.40 | 4.59 | -27.00 | 0.03 | 166 / 192 | **PASSED** |
+| **K** | `occupied_p3_still` | 690.0 | 20,050 | 29.06 | 29.40 | 5.34 | -36.34 | 0.91 | 165 / 192 | **PASSED** |
+| **L** | `empty` | 690.0 | 20,236 | 29.33 | 29.42 | 3.93 | -27.13 | 0.33 | 166 / 192 | **PASSED** |
+| **M** | `occupied_p4_still` | 690.0 | 20,171 | 29.23 | 29.41 | 4.37 | -29.31 | 0.52 | 166 / 192 | **PASSED** |
 
 ### 9.4 Physical Propagation Observations: RSSI vs. CSI Discriminability
 
