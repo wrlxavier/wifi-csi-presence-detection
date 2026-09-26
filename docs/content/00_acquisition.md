@@ -29,28 +29,29 @@ The acquisition link consists of two dedicated nodes built on the Espressif ESP3
 | **RF Transceiver** | Integrated 2.4 GHz 802.11b/g/n (1T1R Wi-Fi 4) | OFDM packet modulation, transmission, and baseband demodulation |
 | **Antenna Interface** | External 3 dBi omnidirectional dipole antenna (U.FL connector) | Spatial radiation pattern, multipath capture |
 | **Tripod Mounts** | Precision aluminum tripods with 3-way pan heads | Rigid node positioning at calibrated height and orientation |
-| **Power Delivery (TX)** | 10,000 mAh portable DC power bank (5 V / 2.4 A) | Electrically isolated DC source; eliminates 60 Hz mains hum and ground loops |
+| **Power Delivery (TX)** | Samsung 5V/2A wall charger (mains DC adapter) | Regulated DC power delivery to transmitter node |
 | **Power & Logging (RX)**| High-speed shielded USB connection to host PC | Power delivery and continuous 921,600 baud serial telemetry streaming |
 
 ### 2.2 Functional Roles: Dedicated Link Topology
 
 The two nodes operate in a dedicated, simplex sensing link designed to eliminate non-deterministic network overhead:
 
-- **Transmitter (TX Node):** Configured as a Wi-Fi Station (STA) with a fixed MAC address (`1a:00:00:00:00:00`). It injects regular ICMP echo request packets (or raw frames) directed to the Access Point at a constant nominal rate of $30\text{ Hz}$ ($T_{\text{nominal}} = 33.33\text{ ms}$). Powered by a battery bank, it remains completely uncoupled from the host workstation and mains electricity.
-- **Receiver (RX Node):** Configured as a Wi-Fi Access Point (AP) broadcasting the dedicated SSID `CSI_AP` on primary RF channel 11 with BSSID `1c:db:d4:9d:93:dc`. The ESP-IDF CSI capture subsystem is enabled on the RX node. For every valid incoming frame from the TX MAC address, the hardware physical layer decodes the OFDM preamble, computes the channel estimation matrix, triggers an internal interrupt callback (`wifi_csi_cb_t`), formats the CSI payload and control headers into an ASCII record, and transmits it over UART to the host PC.
+- **Protocol Architecture (ESP-NOW vs. Legacy STA/AP Model):** While early experimental planning explored an Access Point (AP) / Station (STA) architecture with ICMP ping flooding (which remains reflected in legacy metadata configuration keys such as `ssid: "CSI_AP"` and `role: "STA (ICMP transmitter)"`), the final technical implementation and compiled firmware (`csi_send` and `csi_recv`) operate exclusively via Espressif's connectionless **ESP-NOW** protocol. ESP-NOW functions as a peer-to-peer MAC-layer protocol that transmits raw action frames directly between peer MAC addresses without requiring standard 802.11 association, four-way handshakes, IP allocation, or beacon management overhead.
+- **Transmitter (TX Node):** Running the `csi_send` firmware with a fixed source MAC address (`1a:00:00:00:00:00`). It injects unencrypted ESP-NOW frames directed to the receiver MAC address at a constant nominal rate of $30\text{ Hz}$ ($T_{\text{nominal}} = 33.33\text{ ms}$). Powered by a Samsung 5V/2A wall charger, it operates autonomously without tethering to a computer.
+- **Receiver (RX Node):** Running the `csi_recv` firmware with MAC address `1c:db:d4:9d:93:dc`, tuned to primary RF channel 11 with HT40 secondary channel below. The ESP-IDF CSI capture subsystem is enabled on the RX node via `esp_wifi_set_csi_rx_cb()`. For every valid incoming ESP-NOW frame from the TX MAC address, the hardware physical layer decodes the OFDM preamble, computes the channel estimation matrix, triggers an internal interrupt callback (`wifi_csi_cb_t`), formats the CSI payload and control headers into an ASCII record, and transmits it over UART to the host PC.
 
 ```mermaid
 flowchart LR
     subgraph TX_Node ["Transmitter (TX Node)"]
-        BAT["10,000 mAh Power Bank<br/>(Ground-Isolated)"] --> ESP_TX["ESP32-S3-DevKitC-1U<br/>STA (1a:00:00:00:00:00)"]
+        PWR["Samsung 5V/2A Wall Charger<br/>(Regulated DC Supply)"] --> ESP_TX["ESP32-S3-DevKitC-1U<br/>csi_send (1a:00:00:00:00:00)"]
         ESP_TX --> ANT_TX["3 dBi Dipole<br/>(Height: 1.20 m)"]
     end
 
-    ANT_TX -- "2.4 GHz 802.11n HT40<br/>30 Hz Ping Packet Train" --> CHAN["Indoor Multipath Channel<br/>(LoS: 2.00 m Baseline)"]
+    ANT_TX -- "2.4 GHz 802.11n HT40<br/>30 Hz ESP-NOW Frame Train" --> CHAN["Indoor Multipath Channel<br/>(LoS: 2.00 m Baseline)"]
     CHAN --> ANT_RX["3 dBi Dipole<br/>(Height: 1.20 m)"]
 
     subgraph RX_Node ["Receiver (RX Node)"]
-        ANT_RX --> ESP_RX["ESP32-S3-DevKitC-1U<br/>AP 'CSI_AP' (1c:db:d4:9d:93:dc)"]
+        ANT_RX --> ESP_RX["ESP32-S3-DevKitC-1U<br/>csi_recv (1c:db:d4:9d:93:dc)"]
         ESP_RX -- "Raw CSI Frame<br/>(384 Bytes I/Q + Header)" --> UART["USB-UART Bridge<br/>921,600 Baud"]
     end
 
@@ -68,7 +69,7 @@ The primary benchmark testbed was deployed in a residential bedroom representati
   - Floor-to-ceiling height: $2.85\text{ m}$
   - Total floor area: $11.73\text{ m}^2$
   - Enclosed volume: $33.43\text{ m}^3$
-- **Boundary Construction:** Structural brick masonry walls finished with plaster; reinforced concrete floor slab and ceiling; single plywood interior door ($0.80\text{ m} \times 2.10\text{ m}$) situated on the east wall; iron-frame exterior window with glass panes on the south wall.
+- **Boundary Construction:** Structural brick masonry walls finished with plaster; reinforced concrete floor slab and ceiling; single plywood interior door ($0.80\text{ m} \times 2.10\text{ m}$) situated on the west wall; iron-frame exterior window with glass panes on the south wall.
 - **Interior Clutter & Multipath Scatterers:** Static domestic furniture including a standard double bed (fabric and wood frame), an MDF wardrobe with full-height mirrors, a wooden study desk, an office chair, and two wall-mounted bookshelf niches.
 
 The testbed adopts a 2D Cartesian coordinate frame $(x, y)$ with its origin $(0, 0)$ positioned at the northwest interior corner of the room:
@@ -186,7 +187,7 @@ timestamp_host,type,id,mac,rssi,rate,sig_mode,mcs,bandwidth,smoothing,not_soundi
 | **13** | `fec_coding` | Integer | `0` | Forward Error Correction scheme: 0 = BCC (Binary Convolutional Code). |
 | **14** | `sgi` | Integer | `0` | Short Guard Interval: 0 = standard 800 ns, 1 = 400 ns short GI. |
 | **15** | `noise_floor` | Integer | `-96` | Background noise floor estimate in $\text{dBm}$ measured by RF front-end. |
-| **16** | `ampdu_cnt` | Integer | `0` | Subframe count in aggregate payload (0 for ping packets). |
+| **16** | `ampdu_cnt` | Integer | `0` | Subframe count in aggregate payload (0 for standalone ESP-NOW frames). |
 | **17** | `channel` | Integer | `11` | Primary RF channel number (2462 MHz). |
 | **18** | `secondary_channel`| Integer | `2` | Secondary channel offset: 0 = none, 1 = above, 2 = below (HT40-). |
 | **19** | `local_timestamp` | Integer | `1731067088` | On-chip microsecond hardware timer on the ESP32-S3 receiver. |
@@ -268,15 +269,18 @@ sequenceDiagram
 4. **Post-Condition Safety Buffer ($[t_2, t_3)$, $T_{\text{buffer}} = 30\text{ s}$):** A trailing buffer that ensures no premature movement by the operator or external perturbations contaminate the terminal segments of the active window.
 5. **Total Recording Duration ($T_{\text{total}} = 690\text{ s} = 11.5\text{ min}$):**
    $$T_{\text{total}} = T_{\text{stab}} + T_{\text{active}} + T_{\text{buffer}} = 60\text{ s} + 600\text{ s} + 30\text{ s} = 690\text{ s}$$
-   yielding approximately $20,000\text{ frames}$ per standard recording.
+   yielding approximately $20,000\text{ frames}$ per standard recording. This canonical four-phase protocol was enforced across all standard sessions in the pilot and main benchmark campaigns.
 
-*Exception:* Session J was recorded with an extended active duration $T_{\text{active}} = 1800\text{ s}$ ($30.0\text{ min}$, total duration $1890\text{ s} = 31.5\text{ min}$, $55,075\text{ samples}$) to serve as an extended baseline for evaluating long-duration baseline drift and circadian environmental stability.
+*Campaign Variations & Exceptions:*
+- **Extended Stability Baseline (Session J):** Session J was recorded with an extended active duration $T_{\text{active}} = 1800\text{ s}$ ($30.0\text{ min}$, total duration $1890\text{ s} = 31.5\text{ min}$, $55,075\text{ samples}$) to serve as an extended baseline for evaluating long-duration baseline drift and circadian environmental stability.
+- **Exploratory Trials (First Test Campaign):** Sessions `PLA` and `PLB` were recorded as single $60\text{ s}$ continuous runs ($T_{\text{total}} = 60\text{ s}$, $\approx 1,735\text{ samples}$) for initial serial communication and decoder validation.
+- **Out-of-Distribution Scaling (Generalization Campaign):** Sessions `GA` through `GI` employed a compact $150\text{ s}$ protocol ($T_{\text{stab}} = 60\text{ s}$, $T_{\text{active}} = 60\text{ s}$, $T_{\text{buffer}} = 30\text{ s}$, yielding $\approx 4,000 - 4,400\text{ samples}$ per session) to enable rapid multi-distance sweeps across $2.0\text{ m}$ to $5.0\text{ m}$ in the outdoor covered patio.
 
 ### 5.2 Temporal Synchronization Architecture
 
 - **Host PC System Timestamp:** Host timestamps (`timestamp_host`) are acquired at serial line decode time via Python's `datetime.now().strftime("%Y%m%dT%H%M%S.%f")`, ensuring monotonic alignment with UTC-offset ISO-8601 timestamps in metadata sidecars.
 - **Hardware Timer Cross-Check:** The embedded `local_timestamp` field (ESP32 hardware timer) is periodically cross-referenced against `timestamp_host` to detect packet queuing or serial driver buffering delays.
-- **Midnight-Rollover Handling:** In sessions that traverse midnight UTC/local boundaries (such as Session K, spanning 23:53:51 to 00:05:21), the metadata parser [`get_active_interval_from_metadata`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/metadata_parser.py#L61-L72) detects $t_2 < t_1$ and adds a one-day offset:
+- **Midnight-Rollover Handling:** In sessions that traverse local midnight boundaries (such as Session K, spanning 23:53:51 to 00:05:21), the collector notebook initialized `_date_ref` from the recording start date (`2026-09-22`). When $t_2$ rolled past midnight (`00:04:51`), formatting it with `_date_ref` assigned it to `2026-09-22T00:04:51-03:00`, resulting in an apparent $t_2 < t_1$. To handle this edge case automatically, the metadata parser [`get_active_interval_from_metadata`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/metadata_parser.py#L61-L72) detects $t_2 < t_1$ and adds a one-day offset:
   ```python
   if not pd.isna(start) and not pd.isna(end) and end < start:
       end = end + pd.Timedelta(days=1)
@@ -289,7 +293,7 @@ sequenceDiagram
 The classification objective is binary presence detection:
 $$\mathcal{Y} \in \{0, 1\} \quad (0 = \text{Empty}, 1 = \text{Occupied})$$
 
-To evaluate model generalizability and prevent classifiers from keying on a single localized multipath profile, five distinct occupied scenarios were collected across three experimental campaigns.
+To evaluate model generalizability and prevent classifiers from keying on a single localized multipath profile, five distinct occupied spatial positions (Center, P1, P2, P3, and P4) spanning six distinct occupied experimental conditions were collected across four experimental campaigns.
 
 ```text
                      North Wall
@@ -326,6 +330,9 @@ To evaluate model generalizability and prevent classifiers from keying on a sing
 | `occupied_p2_still` | 1 | $(1.45, 2.78)\text{ m}$ | $0.00\text{ m}$ (On LoS) | Facing North (RX) | Subject standing $30\text{ cm}$ in front of TX node; heavy direct attenuation of transmitted beam. |
 | `occupied_p3_still` | 1 | $(1.45, 1.44)\text{ m}$ | $0.00\text{ m}$ (On LoS) | Facing North (RX) | Subject standing $30\text{ cm}$ in front of RX node; severe diffraction at receiver antenna. |
 | `occupied_p4_still` | 1 | $(1.75, 2.11)\text{ m}$ | $0.30\text{ m}$ (Off LoS East)| Facing North (RX) | Subject shifted $30\text{ cm}$ East; off direct LoS, perturbing reflections off mirrored wardrobe. |
+
+> [!NOTE]
+> **Metadata Ground-Truth Storage:** In the raw JSON sidecar files of multi-position sessions (`session_H` through `session_M`), the nested key `setup.protocol.subject_position` retained the template's default center-mark coordinates $(1.45, 2.11)\text{ m}$. True spatial positioning for each session is unambiguously encoded in `session.label` and explicitly documented in `setup.labels_description`.
 
 ---
 
@@ -424,10 +431,24 @@ The metadata file captures five structured blocks:
         "y_from_north_m": 2.11
       },
       "subject_orientation": "facing north (towards RX node)"
+    },
+    "labels_description": {
+      "empty": "No human presence; operator outside the room with door closed.",
+      "occupied_still": "Subject standing at center mark, motionless.",
+      "occupied_moving": "Subject standing at center mark, slow movements within ±0.30 m.",
+      "occupied_p1_still": "Subject standing motionless approx. 30-50 cm off the line of sight (side 1).",
+      "occupied_p2_still": "Subject standing motionless on the line of sight, approx. 30 cm from the TX node.",
+      "occupied_p3_still": "Subject standing motionless on the line of sight, approx. 30 cm from the RX node.",
+      "occupied_p4_still": "Subject standing motionless approx. 30-50 cm off the line of sight (side 2)."
     }
   }
 }
 ```
+
+> [!NOTE]
+> **Schema Evolution & Legacy Field Artifacts:**
+> 1. **File Path Handling:** In Schema v2.0 (shown above), file paths were logged as absolute filesystem paths (`.../data/main/...`), reflecting the folder layout prior to the final repository organization into `data/01_raw/main/`. Schema v2.1 (implemented via [`generate_session_metadata`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/acquisition/metadata_logger.py#L8-L65) in the generalization campaign) updated this to portable relative paths.
+> 2. **Legacy Protocol Keys:** Keys such as `ssid: "CSI_AP"` and `role: "STA (ICMP transmitter)"` are historical remnants from initial AP/STA prototyping templates in [`csi_collector_v2.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/00_acquisition/csi_collector_v2.ipynb). The physical link executes strictly over MAC-layer ESP-NOW frames, matching `"protocol": "ESP-NOW HT40"`.
 
 ### 7.3 Data Hygiene & Session Invalidation Protocol
 
@@ -539,7 +560,7 @@ Comparing the empirical metrics across spatial positions highlights why CSI is r
 2. **Off-LoS Perturbation & The Inadequacy of RSSI (Session H):**
    In Session H (P1, shifted $30\text{ cm}$ West of the LoS axis), the subject does not break the direct LoS ray. Consequently, the mean RSSI is $-26.49\text{ dBm}$—virtually indistinguishable from the empty room baseline of $-26.47\text{ dBm}$ ($\Delta \text{RSSI} = 0.02\text{ dBm}$). A presence detection model relying solely on RSSI thresholding fails in this scenario. However, multipath reflections bouncing off the subject create frequency-selective constructive and destructive interference across individual subcarriers, producing variance signatures that CSI features capture.
 3. **Link Stability in Static Conditions:**
-   In clean empty sessions (G, J, L), RSSI standard deviation is as low as $0.03 - 0.50\text{ dBm}$, demonstrating that the isolated power supply and fixed mounting suppress electrical and mechanical noise.
+   In clean empty sessions (G, J, L), RSSI standard deviation is as low as $0.03 - 0.50\text{ dBm}$, demonstrating that the regulated DC wall power supply and rigid tripod mounting maintain high electrical and mechanical stability.
 
 ---
 
