@@ -34,7 +34,7 @@ flowchart TD
 
     subgraph Windowing_Features ["3. Slicing, Windowing & Features"]
         M_OUT --> INT["select_active_interval()<br/>Metadata Window [t1, t2] (600s / 1800s)<br/>Discards Stabilization & Buffer"]
-        INT --> WIN["segment_non_overlapping_windows()<br/>Tw = 2.0 s, Non-Overlapping<br/>Quality Filter: min_samples >= 29"]
+        INT --> WIN["segment_non_overlapping_windows()<br/>Tw = 2.0 s, Non-Overlapping<br/>Quality Filter: min_samples >= 26-29 (Nominal 29)"]
         WIN --> FEAT["extract_official_features()<br/>4 Descriptors × 162 Subcarriers:<br/>Variance, MAD, Range, IQR"]
     end
 
@@ -82,7 +82,7 @@ meta = load_metadata(meta_path if meta_path.exists() else None)
 
 The function extracts session parameters into a structured manifest table, capturing:
 - `dataset_source`: Originating campaign folder (`pilot` or `main`).
-- `session_id`: Unique character identifier (`C` to `M`).
+- `session_id`: Unique character identifier (`A` to `M` across candidate sessions).
 - `csv_path` and `metadata_path`: Absolute filesystem locations.
 - `label_name`: Fine-grained condition string inferred from metadata or filename.
 - `metadata_status`: Operational status flag (`VALID` vs. `INVALID`).
@@ -115,7 +115,7 @@ For each valid session, raw CSV rows are ingested through [`load_session_arrays`
 2. **Timestamp Verification:** Validates `timestamp_host` against format `%Y%m%dT%H%M%S.%f`. Rows failing timestamp parsing are dropped.
 3. **CSI Array Decoding:** Decodes the `data` column JSON string into an array of 384 signed 8-bit integers.
 4. **Length Consistency Check:** Enforces that every decoded array matches the expected mode length (`len == 384`). Any corrupted or truncated UART lines are discarded.
-5. **Complex Reconstruction & Amplitude Matrix:** Transforms the raw array $\mathbf{D} \in \mathbb{R}^{N \times 384}$ into a complex matrix $\mathbf{H} \in \mathbb{C}^{N \times 192}$ via [`raw_iq_to_complex`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/csi_decoder.py#L56-L64). The Euclidean amplitude matrix $\mathbf{A} \in \mathbb{R}^{N \times 192}$ is computed via:
+5. **Complex Reconstruction & Amplitude Matrix:** Transforms the raw array $\mathbf{D} \in \mathbb{R}^{N \times 384}$ into a complex matrix $\mathbf{H} \in \mathbb{C}^{N \times 192}$ via [`raw_iq_to_complex`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/csi_decoder.py#L56-L64). In the ESP32 baseband buffer, signed 8-bit integers are interleaved as $[Q_k, I_k]$ pairs where imaginary components precede real components (`imag = raw[0::2]`, `real = raw[1::2]`), reconstructing $H_t(k) = I_t(k) + jQ_t(k)$. The Euclidean amplitude matrix $\mathbf{A} \in \mathbb{R}^{N \times 192}$ is computed via:
    $$\mathbf{A}[t, k] = |H_t(k)| = \sqrt{(\text{Real}(H_t(k)))^2 + (\text{Imag}(H_t(k)))^2}$$
 
 ### 4.2 Shared HT40 Valid-Subcarrier Mask
@@ -182,7 +182,7 @@ Continuous time series are segmented into discrete temporal observation windows 
 - **Window Boundaries:** Window $m$ spans $[t_{\text{start}}^{(m)}, t_{\text{end}}^{(m)})$ where $t_{\text{end}}^{(m)} = t_{\text{start}}^{(m)} + 2.0\text{ s}$.
 - **Minimum Sample Count Quality Filter:** To prevent sparse or stalled transmission intervals from producing biased feature estimates, a window is dropped if its packet count falls below:
   $$N_{\text{samples}}^{(m)} < \max\left(N_{\text{abs\_min}}, \lfloor \alpha \cdot f_{\text{eff}} \cdot T_w \rfloor\right)$$
-  where $N_{\text{abs\_min}} = 5$ (`min_absolute_samples_per_window`), $\alpha = 0.5$ (`min_window_sample_rate_fraction`), and $f_{\text{eff}} \approx 29.0\text{ Hz}$. This requires at least $\lfloor 0.5 \times 29 \times 2.0 \rfloor = 29\text{ packets}$ per 2.0 s window.
+  where $N_{\text{abs\_min}} = 5$ (`min_absolute_samples_per_window`), $\alpha = 0.5$ (`min_window_sample_rate_fraction`), and $f_{\text{eff}}$ is the session's measured effective sampling rate ($26.16\text{ Hz} \le f_{\text{eff}} \le 29.33\text{ Hz}$, nominal $29.0\text{ Hz}$). This establishes a dynamic quality threshold requiring at least $\lfloor 0.5 \times f_{\text{eff}} \times 2.0 \rfloor \in [26, 29]\text{ packets}$ per 2.0 s window. All empirical windows comfortably surpassed this bound (minimum observed: 36 packets).
 
 ### 5.3 Empirical Segmentation Results
 
@@ -214,7 +214,7 @@ The signal processing package provides two optional temporal filtering methods i
 
 ### 6.1 Low-Pass Butterworth Filter
 
-For applications targeting slowly-varying human kinematics while rejecting high-frequency RF noise:
+For applications targeting slowly-varying human kinematics while rejecting high-frequency RF noise, [`butterworth_lowpass_filter`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/signal/denoise.py#L14-L36) implements:
 - **Filter Topology:** Forward-backward low-pass Butterworth filter operating along the temporal axis.
 - **Implementation:** Uses Second-Order Sections (`sos`) with zero-phase filtering (`scipy.signal.sosfiltfilt`):
   ```python
@@ -225,6 +225,7 @@ For applications targeting slowly-varying human kinematics while rejecting high-
 
 ### 6.2 Discrete Wavelet Transform Denoising
 
+The wavelet decomposition pipeline in [`wavelet_denoise`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/signal/denoise.py#L38-L64) features:
 - **Wavelet Family:** Daubechies 4 (`db4`) orthogonal wavelet.
 - **Decomposition Level:** Dynamic decomposition level bounded by signal length:
   $$J = \min(J_{\text{target}}, \lfloor \log_2(N / (L_{\text{filter}} - 1)) \rfloor)$$
@@ -270,12 +271,12 @@ For each 2.0-second window containing $N$ amplitude observations across 162 reta
   $$\mathbf{f}_j = [\text{var}_j, \text{mad}_j, \text{range}_j, \text{iqr}_j]$$
 - **Total Feature Count:** Concatenating all 162 subcarriers produces:
   $$D = 162\text{ subcarriers} \times 4\text{ descriptors} = 648\text{ features}$$
-- **Feature Naming Specification:** Features follow the canonical format:
+- **Feature Naming Specification:** Formatted via [`make_feature_columns`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/features/statistical.py#L14-L21), features follow the canonical format:
   $$\text{sc}\{j:03d\}\_\{\text{descriptor}\} \quad \longrightarrow \quad \text{sc000\_var}, \text{sc000\_mad}, \text{sc000\_range}, \text{sc000\_iqr}, \dots, \text{sc161\_iqr}$$
 
 ### 7.3 Schema of Assembled Feature Dataset
 
-The assembled dataset combines 9 operational metadata columns with 648 feature columns, yielding **657 total columns**:
+Assembled via [`build_feature_dataset`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/features/extractor.py#L19-L105), the resulting dataset combines 9 operational metadata columns with 648 feature columns, yielding **657 total columns**:
 
 | Column Range | Column Category | Data Type | Field Names / Formats | Purpose |
 | :---: | :--- | :---: | :--- | :--- |
@@ -295,16 +296,18 @@ wifi-csi-presence-detection/
 │   ├── features_ht40.csv              # Interoperable tabular CSV dataset (3900x657)
 │   ├── valid_subcarrier_mapping.csv   # Index mapping table (162 retained -> raw 0-191)
 │   ├── figures/                       # Primary diagnostic figures (distributions, PCA, boxplots)
-│   └── splits/                        # train.parquet (2730), val.parquet (585), test.parquet (585)
+│   └── splits/                        # Downstream modeling splits (01_split.ipynb): train (2730), val (585), test (585)
 ├── reports/logs/
 │   └── pipeline_report_latest.json    # Machine-readable audit manifest
-└── outputs/pipeline_v1/figures/       # Mirrored diagnostic figures export
+└── outputs/pipeline_v1/figures/       # Mirrored diagnostic figures export from initial run
 ```
 
 1. **[`features_ht40.parquet`](file:///home/xavier/dev/wifi-csi-presence-detection/data/03_processed/features_ht40.parquet):** Primary binary storage format. Uses Snappy compression and columnar layout, providing fast read performance for model training.
 2. **[`features_ht40.csv`](file:///home/xavier/dev/wifi-csi-presence-detection/data/03_processed/features_ht40.csv):** Plaintext CSV export maintained for universal cross-platform reproducibility.
 3. **[`valid_subcarrier_mapping.csv`](file:///home/xavier/dev/wifi-csi-presence-detection/data/03_processed/valid_subcarrier_mapping.csv):** Two-column mapping table (`valid_subcarrier_index`, `raw_subcarrier_index`) providing traceability between baseband OFDM subcarrier indices and engineered features.
 4. **[`pipeline_report_latest.json`](file:///home/xavier/dev/wifi-csi-presence-detection/reports/logs/pipeline_report_latest.json):** Full JSON audit manifest recording pipeline run parameters, discovered sessions, excluded files, per-session metrics, retained subcarrier counts, window tallies, and class distributions.
+
+*(Note: The downstream partition directory `data/03_processed/splits/` is populated during the subsequent modeling stage by [`01_split.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/04_modeling/01_split.ipynb), which applies a 70/15/15 stratified partition directly on `features_ht40.parquet`.)*
 
 ---
 
@@ -319,21 +322,30 @@ The assembled canonical dataset consists of **3,900 windows** representing **130
 
 ### 9.2 Automated Pipeline Assertions
 
-[`pipeline_v1.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/02_pipeline/pipeline_v1.ipynb) executes three programmatic assertions before completing:
-1. **Window Temporal Non-Overlap:** Verifies that within each session, all window intervals are strictly non-overlapping:
+[`pipeline_v1.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/02_pipeline/pipeline_v1.ipynb) executes an automated validation suite (Cell 30) before serializing the final summary, terminating with an exception if any condition is violated:
+1. **Window Temporal Non-Overlap:** `assert_non_overlapping_windows` verifies that within each session, all window intervals are strictly non-overlapping:
    $$\operatorname{start}_{m+1} \ge \operatorname{end}_m, \quad \forall m \in \{0, 1, \dots, M - 2\}$$
 2. **Feature Dimensionality Check:** Asserts that the feature column count strictly equals $4 \times N_{\text{shared}}$:
    $$\text{len}(\text{feature\_columns}) == 4 \times 162 = 648$$
-3. **Numerical Completeness:** Validates that the feature matrix contains zero `NaN`, `Inf`, or null entries.
+3. **Numerical Completeness & Column Integrity:** Validates that no feature column is composed entirely of missing values (`assert not features_df[feature_columns].isna().all(axis=0).any()`).
+4. **Binary Label Integrity:** Verifies that unique target labels belong strictly to the binary set $\{0, 1\}$.
+5. **Uniform Metadata Status:** Enforces that every loaded session possesses `metadata_status == "VALID"`.
+6. **Anti-Regression HT40 Architecture Guards:** Explicitly asserts against legacy regressions:
+   - `raw_subcarrier_count != 64` (guards against accidental fallback to 20 MHz HT20 layouts).
+   - `n_shared_valid_subcarriers != 51` (guards against early pilot fixed-subcarrier artifacts).
+   - `feature_count != 4 * 51` (guards against legacy 204-feature fixed schemas).
+7. **Representation Hygiene & Leakage Prevention:** Scans all dataset columns against forbidden scaling substrings (`["scaled", "standardized", "zscore", "z_score", "normalized"]`), ensuring the canonical dataset remains strictly in natural physical units and preventing data leakage prior to downstream train/test splitting.
 
 ### 9.3 2D SVD/PCA Diagnostic Projection
 
-To evaluate feature separability prior to model training, the pipeline computes a centered 2D Singular Value Decomposition (PCA) projection across the 648 standardized features:
-- **Variance Explained:** The first principal component (PC1) accounts for **79.19%** of total feature variance, while PC2 accounts for **4.60%** (cumulative: **83.79%** across two dimensions).
-- **Cluster Structure:**
-  - Empty windows form a compact, low-variance cluster centered at $\text{PC1} \approx -1.56$ ($\sigma = 6.36$).
-  - Occupied windows exhibit wider dispersion with positive mean $\text{PC1} \approx +1.82$ ($\sigma = 32.54$), capturing the broad variance introduced across different human positions and kinematics.
-- **Diagnostic Outcome:** Confirms that the four dispersion features provide strong linear separability between presence states.
+To evaluate feature separability prior to model training, the pipeline computes a 2D Singular Value Decomposition (PCA) projection across the 648 features:
+- **Notebook Exploratory Projection:** The notebook function `diagnostic_pca_2d()` applies a lightweight mean-centered SVD projection without variance scaling (`centered = centered - centered.mean(axis=0)`), producing the exploratory plot [`diagnostic_pca_2d_v1.png`](file:///home/xavier/dev/wifi-csi-presence-detection/data/03_processed/figures/diagnostic_pca_2d_v1.png). In this unstandardized covariance space, PC1 accounts for **81.47%** and PC2 accounts for **8.60%** (cumulative: **90.06%**) of unweighted variance.
+- **Standardized Feature Projection (Model-Input Representation):** When evaluated on standardized features ($z = (x - \mu)/\sigma$, matching the downstream modeling pipeline requirements):
+  - **Variance Explained:** The first principal component (PC1) accounts for **79.19%** of total feature variance, while PC2 accounts for **4.60%** (cumulative: **83.79%** across two dimensions).
+  - **Cluster Structure:**
+    - Empty windows form a compact, low-variance cluster centered at $\text{PC1} \approx -1.56$ ($\sigma = 6.36$) and $\text{PC2} \approx +2.03$ ($\sigma = 3.35$).
+    - Occupied windows exhibit wide dispersion with positive mean $\text{PC1} \approx +1.82$ ($\sigma = 32.55$) and $\text{PC2} \approx -2.37$ ($\sigma = 6.40$), capturing the broad RF perturbation introduced across diverse human positions and movements.
+- **Diagnostic Outcome:** Confirms that the four dispersion descriptors provide substantial linear separability between presence states while highlighting the physical necessity of standardizing heterogeneous dispersion scales during modeling.
 
 ---
 

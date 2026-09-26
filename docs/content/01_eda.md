@@ -70,7 +70,7 @@ To visualize time series across 192 subcarriers without visual clutter or arbitr
 
 ---
 
-## 3. Phase I: Initial Feasibility & Sanity Validation (`eda_first_test.ipynb`)
+## 3. Phase I: Initial Feasibility & Sanity Validation ([`eda_first_test.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_first_test.ipynb))
 
 The First Test campaign evaluated two initial 60-second exploratory sessions (`PLA` and `PLB`) recorded in IEEE 802.11n HT20 mode on Channel 6 ($2437\text{ MHz}$, $20\text{ MHz}$ bandwidth).
 
@@ -102,7 +102,7 @@ flowchart TD
 
 ---
 
-## 4. Phase II: Controlled Pilot Campaign Analysis (`eda_pilot.ipynb`)
+## 4. Phase II: Controlled Pilot Campaign Analysis ([`eda_pilot.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_pilot.ipynb))
 
 The Pilot campaign scaled the sensing system to IEEE 802.11n HT40 channel bonding on Channel 11 ($2462\text{ MHz}$ primary, $2452\text{ MHz}$ center frequency, $40\text{ MHz}$ bandwidth). Four full-length ($690\text{ s}$) sessions were analyzed: `C` (empty), `D` (occupied still), `E` (occupied moving), and `F` (repeat empty).
 
@@ -131,13 +131,13 @@ The Pilot campaign scaled the sensing system to IEEE 802.11n HT40 channel bondin
    - Total reported subcarriers: $192$.
    - Active, valid subcarriers: $166$ (satisfying mean amplitude threshold $\mu_k > 0.5$).
    - Dead subcarriers: $26$ carriers registering zero amplitude (comprising upper/lower guard bands and the central DC notch).
-   - Impulsive/noisy carriers: $17$ carriers exceeded the 90th percentile of Coefficient of Variation ($\text{CV} > 0.287$).
+   - Impulsive/noisy carriers: $17$ carriers exceeded the 90th percentile of Coefficient of Variation ($\text{CV}_{\text{thresh}} = 0.106$, so $\text{CV} > 0.106$).
 4. **Architectural Lessons & Protocol Refinement:**
    The pilot confirmed that direct center-mark obstruction creates strong signal signatures. However, evaluating only the central LoS position left the system's sensitivity to off-LoS multipath unknown. This motivated the design of the Main campaign's multi-position spatial matrix (`p1` to `p4`).
 
 ---
 
-## 5. Phase III: Main Multi-Position Benchmark Campaign (`eda_main.ipynb`)
+## 5. Phase III: Main Multi-Position Benchmark Campaign ([`eda_main.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_main.ipynb))
 
 The Main benchmark campaign is the primary experimental dataset of this thesis. It comprises seven sessions (`G` through `M`) covering $175,578\text{ raw CSI frames}$ and $100.5\text{ minutes}$ of total recording time ($157,211\text{ frames}$ and $90.0\text{ minutes}$ of strictly ground-truth active monitoring) in the residential testbed.
 
@@ -163,7 +163,7 @@ Every captured session was verified across transmission and data structure param
 | **Missing Values (NaN)** | 0 (None) | 0 (None) | 0 (None) | 0 (None) | 0 (None) | 0 (None) | 0 (None) |
 | **Field `len` Integrity** | 384 (100%) | 384 (100%) | 384 (100%) | 384 (100%) | 384 (100%) | 384 (100%) | 384 (100%) |
 | **Effective Rate ($f_{\text{eff}}$)**| $29.20\text{ Hz}$ | $28.96\text{ Hz}$ | $28.86\text{ Hz}$ | $29.14\text{ Hz}$ | $29.06\text{ Hz}$ | $29.33\text{ Hz}$ | $29.23\text{ Hz}$ |
-| **Median Rate ($f_{\text{med}}$)** | $29.36\text{ Hz}$ | $29.36\text{ Hz}$ | $29.36\text{ Hz}$ | $29.36\text{ Hz}$ | $29.36\text{ Hz}$ | $29.36\text{ Hz}$ | $29.36\text{ Hz}$ |
+| **Median Rate ($f_{\text{med}}$)** | $29.38\text{ Hz}$ | $29.38\text{ Hz}$ | $29.42\text{ Hz}$ | $29.40\text{ Hz}$ | $29.40\text{ Hz}$ | $29.42\text{ Hz}$ | $29.41\text{ Hz}$ |
 | **Jitter $\sigma_{\Delta t}$** | $4.63\text{ ms}$ | $5.28\text{ ms}$ | $5.79\text{ ms}$ | $4.59\text{ ms}$ | $5.34\text{ ms}$ | $3.93\text{ ms}$ | $4.37\text{ ms}$ |
 | **Packet Loss Rate** | $0.03\%$ | $0.18\%$ | $0.18\%$ | $0.07\%$ | $0.07\%$ | $0.01\%$ | $0.01\%$ |
 | **Packet Gaps ($>83.3\text{ ms}$)**| 4 events | 18 events | 19 events | 20 events | 7 events | 2 events | 2 events |
@@ -208,9 +208,9 @@ The exploratory notebook [`eda_main.ipynb`](file:///home/xavier/dev/wifi-csi-pre
 - **Artifact:** [`outputs/main/plot5_stability_amplitude_phase.png`](file:///home/xavier/dev/wifi-csi-presence-detection/outputs/main/plot5_stability_amplitude_phase.png)
 - **Stationarity Analysis:** Evaluates whether baseline drift over extended periods could generate false alarms:
   1. *30-Second Rolling Mean (Session J - 31.5 min):* Traces for 5 representative subcarriers show horizontal trajectories with drift bounded within $\pm 0.5$ amplitude units across half an hour.
-  2. *Unwrapped Phase Stability (Session J):* Confirms smooth linear evolution without erratic jumps or cycle slips during unoccupied states.
+  2. *Unwrapped Phase Stability (Session J):* Confirms continuity without discrete cycle slips during unoccupied states, but demonstrates continuous cumulative drift spanning over $2,000\text{ radians}$ (from $0$ to $\approx -2,000\text{ rad}$) over 31.5 minutes due to unsynchronized hardware oscillator frequency offsets (CFO/SFO) and thermal wander. This provides direct empirical proof for why raw phase cannot be used directly without complex calibration, validating the choice of Euclidean amplitude.
   3. *Cumulative Standard Deviation Convergence:* Tracing $\sigma_{\text{cum}}(t) = \sqrt{\frac{1}{t}\sum_{\tau=1}^t (A(\tau) - \bar{A}_t)^2}$ reveals that subcarrier variance converges within the first $30 - 45\text{ seconds}$, confirming that the 60-second stabilization interval ($T_{\text{stab}} = 60\text{ s}$) is sufficient for link convergence.
-  4. *Cross-Session Empty Consistency:* Compares mean spectral profiles across Session G (17:01), Session J (20:01), and Session L (00:11). The profiles overlay across all 165 valid subcarriers with an average difference of $< 1.2\%$, establishing that the indoor static multipath environment remained stationary across the 7-hour collection campaign.
+  4. *Cross-Session Empty Consistency:* Compares mean spectral profiles across Session G (17:01), Session J (20:00), and Session L (00:09). Profiles for Session J and Session L—collected 4.5 hours apart—overlay almost identically across all valid subcarriers with an overall mean amplitude difference of only $\sim 1.1\%$ ($24.91$ vs. $25.19$, per-subcarrier delta $< 2.9\%$), establishing excellent long-term channel stationarity. Session G shares the identical frequency-selective profile shape (matching constructive peaks and destructive notches) but exhibits an elevated global amplitude scale ($35.71$), reflecting the initial RF frontend automatic gain control (AGC) operating point prior to extended continuous collection.
 
 ### 6.6 Plot 6: Inter-Packet Arrival Intervals & Transmission Jitter
 - **Artifact:** [`outputs/main/plot6_interpacket_intervals.png`](file:///home/xavier/dev/wifi-csi-presence-detection/outputs/main/plot6_interpacket_intervals.png)
@@ -221,27 +221,28 @@ The exploratory notebook [`eda_main.ipynb`](file:///home/xavier/dev/wifi-csi-pre
 ### 6.7 Plot 7: Noisy & Anomalous Subcarrier Identification
 - **Artifact:** [`outputs/main/plot7_noisy_subcarriers.png`](file:///home/xavier/dev/wifi-csi-presence-detection/outputs/main/plot7_noisy_subcarriers.png)
 - **Noise Analysis:** Evaluates the baseline noise profile of Session G across two metrics:
-  - *Coefficient of Variation ($\text{CV}_k$):* The 90th percentile threshold was calculated at $\text{CV}_{\text{thresh}} = 0.287$. Exactly $17\text{ subcarriers}$ were flagged as noisy ($CV > p_{90}$).
-  - *Fisher Excess Kurtosis ($\gamma_{2, k}$):* An impulsiveness threshold of $|\gamma_2| > 5.0$ flagged $23\text{ subcarriers}$.
-  - *Spatial Distribution of Noisy Carriers:* The flagged indices cluster around subcarriers $134 - 145$. In 802.11n HT40 channel bonding, these indices map to the internal transition band between the two bonded 20 MHz channels, where baseband filter roll-off introduces higher variance and lower signal-to-noise ratio.
+  - *Coefficient of Variation ($\text{CV}_k$):* The 90th percentile threshold was calculated at $\text{CV}_{\text{thresh}} = 0.091$ ($\approx 0.0908$). Exactly $17\text{ subcarriers}$ (index 15, and indices 134–142, 144, 146–147, 149–150) were flagged as noisy ($CV > p_{90}$).
+  - *Fisher Excess Kurtosis ($\gamma_{2, k}$):* An impulsiveness threshold of $|\gamma_2| > 5.0$ flagged $23\text{ subcarriers}$ (clustering from subcarrier 136 through 161, with an isolated outlier at index 173).
+  - *Spatial Distribution of Noisy Carriers:* The flagged indices cluster prominently around subcarriers $134 - 155$. In 802.11n HT40 channel bonding, these indices map to the internal transition band between the two bonded 20 MHz primary and secondary channels, where baseband filter roll-off introduces higher variance and lower signal-to-noise ratio. Subcarrier 15 also shows elevated CV near the lower band edge.
 
 ### 6.8 Plot 8: Full-Spectrum CSI Amplitude Heatmaps
 - **Artifact:** [`outputs/main/plot8_heatmap_amplitude.png`](file:///home/xavier/dev/wifi-csi-presence-detection/outputs/main/plot8_heatmap_amplitude.png)
-- **Time-Frequency Spectrogram Analysis:** Displays 2D heatmaps (192 subcarriers on the y-axis vs. time on the x-axis) across all seven sessions.
+- **Time-Frequency Spectrogram Analysis:** Displays 2D heatmaps of active Channel Frequency Response (valid subcarriers on the y-axis—166 for G, H, I, J, L, M and 165 for K—vs. time on the x-axis) across all seven sessions, with dead guard bands and DC null carriers excluded.
   - In empty sessions (`G`, `J`, `L`), the heatmap displays clean, invariant horizontal bands representing static multipath reflections from fixed room boundaries.
   - In occupied sessions (`H`, `I`, `K`, `M`), the horizontal structure is broken by temporal ripples, vertical striations, and amplitude modulations caused by human presence.
 
 ### 6.9 Plot 9: Global Amplitude Distribution per Condition
 - **Artifact:** [`outputs/main/plot9_boxplot_amplitude.png`](file:///home/xavier/dev/wifi-csi-presence-detection/outputs/main/plot9_boxplot_amplitude.png)
-- **Statistical Aggregation Analysis:** Aggregates amplitude values across all valid subcarriers into condition-level distributions.
-  - Demonstrates that on-LoS occupied positions (`p2`, `p3`) shift the global amplitude distribution downward due to torso absorption, while off-LoS positions (`p1`, `p4`) retain median values close to the empty baseline but exhibit broader interquartile ranges (IQR).
+- **Statistical Aggregation Analysis:** Evaluates condition-level distributions of the per-packet median CSI amplitude across valid subcarriers.
+  - Demonstrates that on-LoS occupied positions (`p2` in Session I, `p3` in Session K) shift the median amplitude distribution sharply downward to $\approx 13.3$ and $13.8$ (compared to $\approx 27.2 - 28.2$ for empty baselines J and L) due to direct-path torso absorption.
+  - Conversely, off-LoS positions (`p1` in Session H, `p4` in Session M) retain substantially higher median amplitudes ($\approx 32.5$ and $20.8$) while displaying broader interquartile ranges (IQR) and extended dynamic outlier whiskers caused by multipath scattering.
 
 ### 6.10 Plot 10: Spatial Position Discriminability & Variance Analysis
 - **Artifact:** [`outputs/main/plot10_position_variance_discriminability.png`](file:///home/xavier/dev/wifi-csi-presence-detection/outputs/main/plot10_position_variance_discriminability.png)
 - **Discriminability Analysis:** Provides the physical justification for using dispersion features:
-  - *Panel 1 (Absolute Variance):* Compares per-subcarrier variance $\sigma_k^2$ for the averaged Empty baseline against positions P1, P2, P3, and P4. Empty variance remains consistently near zero ($\sigma_{\text{empty}}^2 < 0.05$) across almost all subcarriers. In contrast, occupied positions exhibit variance peaks ranging from $0.5$ to $4.0$.
-  - *Panel 2 (Variance Ratio / Sensitivity):* Computes the ratio $R_k = \sigma_{k, \text{occ}}^2 / \sigma_{k, \text{empty}}^2$. Across multiple subcarriers, $R_k$ exceeds $5.0$, reaching peaks over $20.0$.
-  - *Off-LoS Sensitivity:* In Position P1 (Off-LoS West, Session H)—where RSSI showed zero attenuation—the variance ratio $R_k$ exceeds $8.0$ across several subcarriers, proving that CSI variance metrics detect presence in areas blind to RSSI.
+  - *Panel 1 (Absolute Variance):* Compares per-subcarrier temporal variance $\sigma_k^2$ for the averaged Empty baseline against positions P1, P2, P3, and P4 across the 165 shared valid subcarriers. The averaged empty baseline exhibits low variance on lower subcarriers ($\sigma^2 \approx 0.33 - 0.50$ on indices 6–57) and moderate variance ($\sigma^2 \approx 3.5 - 8.18$, median $3.68$) on bonded carriers. In contrast, occupied positions induce substantial dynamic variance excursions, peaking at $12.81$ (P1, Session H), $7.92$ (P2, Session I), $9.29$ (P3, Session K), and $7.28$ (P4, Session M).
+  - *Panel 2 (Variance Ratio / Sensitivity):* Computes the spatial discriminability ratio $R_k = \sigma_{k, \text{occ}}^2 / \max(\sigma_{k, \text{empty}}^2, 10^{-4})$.
+  - *Off-LoS Perturbation vs. On-LoS Attenuation:* In Position P1 (Off-LoS West, Session H)—where RSSI showed virtually zero attenuation ($\Delta\text{RSSI} = -0.02\text{ dBm}$)—the variance ratio $R_k$ remains elevated across virtually the entire spectrum, averaging $1.97$ and peaking at $2.57\times$ the empty baseline. Because the direct path remains unobstructed, carrier power is preserved while human micro-movements continuously scatter multipath rays. In contrast, for on-LoS positions (P2, P3), torso absorption suppresses total carrier power so heavily that absolute variance on several subcarriers dips below empty baseline ($R_k$ down to $0.27 - 0.31$), while sensitive multipath subcarriers still peak at $1.65\times$ and $2.10\times$.
 
 ---
 
@@ -264,7 +265,7 @@ graph LR
         P1["P1: Off-LoS West (1.15, 2.11)"] --- P4["P4: Off-LoS East (1.75, 2.11)"]
         P1 & P4 --> M1["Unobstructed Direct Path"]
         M1 --> M2["Zero RSSI Attenuation (Δ = 0.02 dB)"]
-        M1 --> M3["High Variance on Sensitive Carriers (R > 8x)"]
+        M1 --> M3["Elevated Variance Across Carriers (R up to 2.57x)"]
     end
 ```
 
@@ -274,9 +275,9 @@ graph LR
 | **Mean RSSI (dBm)** | $-26.47 \text{ to } -27.13$ | $-35.59$ | $-36.34$ | $-26.49$ | $-29.31$ |
 | **$\Delta \text{RSSI}$ vs. Baseline** | $0.00\text{ dB}$ | **$-9.12\text{ dB}$** | **$-9.87\text{ dB}$** | **$-0.02\text{ dB}$** | **$-2.84\text{ dB}$** |
 | **RSSI Std ($\sigma_{\text{RSSI}}$)** | $0.03 - 0.50\text{ dBm}$ | $1.02\text{ dBm}$ | $0.91\text{ dBm}$ | $0.66\text{ dBm}$ | $0.52\text{ dBm}$ |
-| **CSI Mean Amplitude** | High ($\approx 12 - 22$) | Heavily Attenuated | Heavily Attenuated | Near Baseline | Minor Notch Shifts |
-| **Subcarrier Variance** | Extremely Low ($<0.05$) | Moderate to High | Moderate to High | High on selective subcarriers | High on selective subcarriers |
-| **Max Variance Ratio ($R_k$)**| $1.0$ (Reference) | $> 15\times$ | $> 18\times$ | **$> 8\times$** | **$> 12\times$** |
+| **CSI Mean Amplitude** | High ($\approx 25 - 35$ mean) | Heavily Attenuated ($\approx 11.3$) | Heavily Attenuated ($\approx 12.7$) | Near Baseline ($\approx 26.6$) | Moderate ($\approx 19.4$) |
+| **Subcarrier Variance** | Low to Moderate (med $3.68$) | Suppressed to Moderate | Suppressed to Moderate | High across spectrum (peak $12.81$) | Moderate (peak $7.28$) |
+| **Max Variance Ratio ($R_k$)**| $1.0$ (Reference) | $1.65\times$ | $2.10\times$ | **$2.57\times$ (med $1.97\times$)** | **$1.21\times$** |
 | **Detectability via RSSI** | N/A (Baseline) | Strong | Strong | **Zero (Blind)** | Weak / Ambiguous |
 | **Detectability via CSI** | N/A (Baseline) | Strong | Strong | **Strong** | **Strong** |
 
@@ -318,7 +319,7 @@ The findings from this exploratory phase establish several direct specifications
    - This provides sufficient sample support for computing statistical dispersion metrics (Variance, MAD, Range, IQR) while maintaining responsiveness for presence detection.
 3. **Primary Feature Modality:**
    - Because raw phase exhibits linear drifts from unsynchronized crystal oscillators, feature extraction should operate primarily on Euclidean amplitude $|H(k)|$.
-   - Amplitude dispersion metrics (Variance, MAD, Range, IQR) directly capture the variance ratios ($R_k > 8 - 20\times$) identified in Plot 10.
+   - Amplitude dispersion metrics (Variance, MAD, Range, IQR) directly capture the variance perturbation ($R_k$ up to $2.57\times$ in off-LoS geometries and up to $2.10\times$ on sensitive on-LoS carriers) identified in Plot 10.
 4. **Session-Level Isolation in Validation Splits:**
    - Temporal autocorrelation between consecutive 2.0-second windows within the same session is high.
    - Cross-validation splitting must use session-level grouping (`StratifiedGroupKFold` or Leave-One-Session-Out) to avoid temporal data leakage.

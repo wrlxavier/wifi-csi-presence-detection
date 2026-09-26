@@ -235,7 +235,7 @@ sequenceDiagram
     participant RX as ESP32-S3 RX Node
     participant File as Disk Storage (.csv + .json)
 
-    Op->>PC: Launch Cell 4 (START_DELAY = 15s)
+    Op->>PC: Launch Section 4: Data Collection (START_DELAY = 15s)
     Note over Op,PC: Countdown: Operator exits room or assumes static position
     PC->>RX: Open Serial Port (/dev/ttyUSB0 @ 921600)
     Note over PC,File: Timestamp t0: Recording Start (Local ISO-8601)
