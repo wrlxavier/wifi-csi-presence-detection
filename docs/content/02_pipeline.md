@@ -294,10 +294,11 @@ wifi-csi-presence-detection/
 │   ├── features_ht40.parquet          # Primary binary columnar dataset (snappy, 3900x657)
 │   ├── features_ht40.csv              # Interoperable tabular CSV dataset (3900x657)
 │   ├── valid_subcarrier_mapping.csv   # Index mapping table (162 retained -> raw 0-191)
+│   ├── figures/                       # Primary diagnostic figures (distributions, PCA, boxplots)
 │   └── splits/                        # train.parquet (2730), val.parquet (585), test.parquet (585)
 ├── reports/logs/
 │   └── pipeline_report_latest.json    # Machine-readable audit manifest
-└── outputs/pipeline_v1/figures/       # Diagnostic figures (distributions, PCA, heatmaps)
+└── outputs/pipeline_v1/figures/       # Mirrored diagnostic figures export
 ```
 
 1. **[`features_ht40.parquet`](file:///home/xavier/dev/wifi-csi-presence-detection/data/03_processed/features_ht40.parquet):** Primary binary storage format. Uses Snappy compression and columnar layout, providing fast read performance for model training.

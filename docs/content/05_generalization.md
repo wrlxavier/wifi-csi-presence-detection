@@ -422,7 +422,7 @@ All evaluation artifacts, tabular data, and publication-ready diagnostic figures
 The empirical findings from this generalization stage yield three definitive engineering principles for deploying Wi-Fi CSI presence detection systems on low-power edge microcontrollers (ESP32-S3):
 
 1. **Mandate Lightweight Models for Cross-Environment Robustness:**
-   Deploying full-feature models (648 features) in production is an anti-pattern. Beyond requiring $32\times$ more memory ($83\text{ KB}$ vs. $2.6\text{ KB}$) and $14\times$ longer inference latency ($50\text{ }\mu\text{s}$ vs. $3.5\text{ }\mu\text{s}$), full models suffer **severe environmental overfitting**, producing false alarm rates $>80\%$ in unseen rooms. The Lightweight Family (20 features / 5 subcarriers) must be deployed exclusively.
+   Deploying full-feature models (648 features) in production is an anti-pattern. Beyond requiring up to $29\times$ more memory (e.g. $2.4\text{ MB}$ for full SVM vs. $83.2\text{ KB}$ for light SVM) and substantially higher inference latency ($50 - 110\text{ }\mu\text{s}$ vs. $3.5 - 4.3\text{ }\mu\text{s}$), full models suffer **severe environmental overfitting**, producing false alarm rates $>80\%$ in unseen rooms. The Lightweight Family (20 features / 5 subcarriers) must be deployed exclusively.
 
 2. **Constrain Physical Inter-Node Spacing to $2.0 - 3.0\text{ m}$:**
    The effective operational range for zero-shot presence detection without localized recalibration is $2.0\text{ m}$ to $3.0\text{ m}$. Within this window, `random_forest_light` and `mlp_light` achieve **$>98\%$ macro $F_1$** in an unseen outdoor patio without any fine-tuning.

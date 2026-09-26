@@ -191,13 +191,13 @@ Evaluating the top-10 valid subcarrier indices within each descriptor category r
   - Raw indices: `[179, 180, 171, 185, 77, 181, 184, 172, 93, 81]`
   - F-statistic range: $269.9 - 377.1$
 - **Peak-to-Peak Range (`range`):**
-  - Valid indices: `[150, 151, 142, 156, 152, 155, 143, 59, 159, 148]`
-  - Raw indices: `[179, 180, 171, 185, 181, 184, 172, 77, 188, 177]`
-  - F-statistic range: $254.1 - 342.6$
+  - Valid indices: `[150, 151, 55, 159, 142, 143, 155, 51, 60, 156]`
+  - Raw indices: `[179, 180, 73, 188, 171, 172, 184, 69, 78, 185]`
+  - F-statistic range: $200.0 - 235.4$
 - **Interquartile Range (`iqr`):**
-  - Valid indices: `[150, 151, 142, 156, 152, 59, 155, 143, 75, 63]`
-  - Raw indices: `[179, 180, 171, 185, 181, 77, 184, 172, 93, 81]`
-  - F-statistic range: $268.4 - 375.4$
+  - Valid indices: `[150, 130, 151, 152, 129, 131, 59, 63, 124, 75]`
+  - Raw indices: `[179, 159, 180, 181, 158, 160, 77, 81, 153, 93]`
+  - F-statistic range: $255.9 - 375.4$
 
 ### 5.4 Physical RF Interpretation of Spectral Clustering
 

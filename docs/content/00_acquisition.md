@@ -128,11 +128,12 @@ The link operates under fixed physical layer modulation parameters to ensure tha
 
 ### 3.3 OFDM Subcarrier Structure
 
-In an 802.11n HT40 channel, the baseband Inverse Fast Fourier Transform (IFFT) / Fast Fourier Transform (FFT) operates over a 128-point transform for each 20 MHz subchannel, producing a 256-bin spectrum. The ESP32-S3 baseband engine extracts and reports $N_{\text{sub}} = 192$ complex subcarrier coefficients per received frame (`HT40_N_SUBCARRIERS = 192` in [`constants.py`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/core/constants.py#L3)):
+In an 802.11n HT40 channel, the physical layer bonds two adjacent 20 MHz channels into a 40 MHz channel utilizing a 128-point Fast Fourier Transform (FFT) with subcarrier spacing $\Delta f = 312.5\text{ kHz}$ ($128 \times 312.5\text{ kHz} = 40.0\text{ MHz}$). While the standard 802.11n HT40 mask defines 114 data subcarriers and 6 pilot subcarriers (120 occupied subcarriers), the Espressif ESP32-S3 baseband engine extracts and reports an extended spectrum of $N_{\text{sub}} = 192$ complex subcarrier coefficients per received frame (`HT40_N_SUBCARRIERS = 192` in [`constants.py`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/core/constants.py#L3)):
 
 - **Subcarrier Spacing:** $\Delta f = 312.5\text{ kHz}$.
-- **Active Subcarriers:** Data subcarriers ($108$ per 20 MHz half-channel) and pilot subcarriers ($6$ per 20 MHz half-channel) used for phase and frequency tracking.
-- **Null Subcarriers:** The 192 reported bins span data carriers, pilots, guard band subcarriers at band edges, and the central Direct Current (DC) subcarrier ($0\text{ Hz}$ baseband offset). Guard and DC subcarriers register zero or near-zero amplitude and are filtered out during preprocessing.
+- **Reported Subcarrier Bins:** 192 complex bins representing the bonded 40 MHz channel response along with adjacent baseband transition bands.
+- **Active Subcarriers:** Data subcarriers and pilot subcarriers used for phase and frequency tracking.
+- **Null Subcarriers:** The 192 reported bins span data carriers, pilots, guard band subcarriers at band edges, and central Direct Current (DC) subcarriers ($0\text{ Hz}$ baseband offset). Guard and DC subcarriers register zero or near-zero amplitude and are filtered out during preprocessing.
 
 ---
 
@@ -263,7 +264,7 @@ sequenceDiagram
    - Radio Frequency Automatic Gain Control (AGC) convergence.
    - Internal crystal oscillator thermal equilibrium.
    - Room air currents and subject physiological breathing rhythms to reach steady state.
-3. **Active Ground-Truth Window ($[t_1, t_2)$, $T_{\text{active}} = 600\text{ s} = 10.0\text{ min}$):** The core acquisition window under verified ground-truth conditions. At $30\text{ Hz}$, this phase produces approximately $17,400\text{ samples}$ per session.
+3. **Active Ground-Truth Window ($[t_1, t_2)$, $T_{\text{active}} = 600\text{ s} = 10.0\text{ min}$):** The core acquisition window under verified ground-truth conditions. At the nominal 30 Hz transmission rate (with empirical delivery rate around $29.1\text{ Hz}$), this phase produces approximately $17,400$ to $17,500\text{ samples}$ per session.
 4. **Post-Condition Safety Buffer ($[t_2, t_3)$, $T_{\text{buffer}} = 30\text{ s}$):** A trailing buffer that ensures no premature movement by the operator or external perturbations contaminate the terminal segments of the active window.
 5. **Total Recording Duration ($T_{\text{total}} = 690\text{ s} = 11.5\text{ min}$):**
    $$T_{\text{total}} = T_{\text{stab}} + T_{\text{active}} + T_{\text{buffer}} = 60\text{ s} + 600\text{ s} + 30\text{ s} = 690\text{ s}$$
@@ -476,7 +477,7 @@ The acquisition stage was conducted across four distinct experimental campaigns:
 
 1. **First Test Campaign (April 2026):** Initial feasibility trial using 802.11n HT20 mode on Channel 6 ($20\text{ MHz}$ bandwidth). Validated the serial capture architecture, baud rate stability, and basic complex I/Q decoding over two 60-second sessions (`PLA` and `PLB`).
 2. **Pilot Campaign (May 2026):** Transitioned to 802.11n HT40 mode on Channel 11 ($40\text{ MHz}$ bandwidth). Six sessions (`A` through `F`) were logged. Established the four-phase timing protocol and demonstrated that direct center-mark obstruction was readily detectable. Revealed that sessions A and B suffered from manual timing entry issues, motivating full automation in v2.
-3. **Main Benchmark Campaign (September 2026):** The primary benchmark dataset comprising seven sessions (`G` through `M`). Implemented full multi-position spatial coverage (`p1` to `p4`), collected $111,578\text{ raw CSI frames}$, and achieved a 100% session validation rate.
+3. **Main Benchmark Campaign (September 2026):** The primary benchmark dataset comprising seven sessions (`G` through `M`). Implemented full multi-position spatial coverage (`p1` to `p4`), collected $175,578\text{ raw CSI frames}$ across all seven sessions ($120,503\text{ frames}$ across the six standard 11.5-minute sessions plus $55,075\text{ frames}$ in the extended 31.5-minute Session J), and achieved a 100% session validation rate.
 4. **Generalization Campaign (September 2026):** Evaluated physical link scaling and spatial transferability across nine sessions (`GA` through `GI`) across four distinct inter-node distances ($2.0\text{ m}, 3.0\text{ m}, 4.0\text{ m}$, and $5.0\text{ m}$) in an outdoor covered patio environment.
 
 ### 9.2 Complete Inventory of Captured Acquisition Sessions

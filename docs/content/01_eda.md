@@ -9,7 +9,7 @@ Exploratory Data Analysis (EDA) forms the empirical foundation of this thesis, b
 The EDA phase was conducted incrementally across three experimental milestones:
 1. **Initial Feasibility Validation ([`eda_first_test.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_first_test.ipynb)):** Validated the foundational hardware communication link, verified high-speed serial decoding integrity, inspected raw phase unwrapping properties, and confirmed the primary detection hypothesis in 802.11n HT20 mode ($20\text{ MHz}$ bandwidth) using a Cohen's $d$ effect-size proxy ($d = 25.427$).
 2. **Controlled Pilot Campaign ([`eda_pilot.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_pilot.ipynb)):** Scaled the radio link to 802.11n HT40 mode ($40\text{ MHz}$ bandwidth, 192 reported subcarriers), evaluated transmission stability across four 11.5-minute sessions (`C` through `F`), quantified the effects of human motion versus static presence on packet arrival jitter, and established objective pass/fail criteria for data ingestion.
-3. **Multi-Position Benchmark Campaign ([`eda_main.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_main.ipynb)):** Executed an exhaustive investigation across seven systematically orchestrated sessions (`G` through `M`, totaling $111,578\text{ raw CSI frames}$ and $5.5\text{ hours}$ of active collection). This stage established the physical inadequacy of RSSI in off-Line-of-Sight (off-LoS) scenarios, mapped subcarrier-by-subcarrier variance response, demonstrated long-term channel stationarity over a 7-hour period, and confirmed full project viability across a 4-point quality checklist.
+3. **Multi-Position Benchmark Campaign ([`eda_main.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_main.ipynb)):** Executed an exhaustive investigation across seven systematically orchestrated sessions (`G` through `M`, totaling $175,578\text{ raw CSI frames}$ across $100.5\text{ minutes}$ of capture time, spanning over $7.5\text{ hours}$ of wall-clock operational execution). This stage established the physical inadequacy of RSSI in off-Line-of-Sight (off-LoS) scenarios, mapped subcarrier-by-subcarrier variance response, demonstrated long-term channel stationarity over a 7-hour period, and confirmed full project viability across a 4-point quality checklist.
 
 ---
 
@@ -90,7 +90,7 @@ flowchart TD
 - **Data Ingestion:** Both `PLA` (empty baseline) and `PLB` (occupied still) completed with exactly 1,735 and 1,736 rows respectively over a $60.0\text{ s}$ duration.
 - **Link Performance:**
   - Packet loss: $0.00\%$ ($0$ dropped packets).
-  - Effective sampling rate: $28.92\text{ Hz}$ (deviation of $3.6\%$ from nominal $30\text{ Hz}$, within the $\pm 10\%$ specification).
+  - Effective sampling rate: Mean rate of $28.92\text{ Hz}$ ($(N-1)/\Delta t_{\text{total}}$, a $3.6\%$ deviation from nominal $30\text{ Hz}$) and median instantaneous rate of $29.41 - 29.42\text{ Hz}$ ($1 / \text{median}(\Delta t)$), fully complying with the $\pm 10\%$ acceptance band.
   - Null/corrupt rows: $0$ missing values; $100\%$ compliance on frame length (`len = 384` bytes).
 
 ### 3.2 Key Analytical Findings
@@ -139,7 +139,7 @@ The Pilot campaign scaled the sensing system to IEEE 802.11n HT40 channel bondin
 
 ## 5. Phase III: Main Multi-Position Benchmark Campaign (`eda_main.ipynb`)
 
-The Main benchmark campaign is the primary experimental dataset of this thesis. It comprises seven sessions (`G` through `M`) covering $111,578\text{ raw CSI frames}$ and $116.8\text{ minutes}$ of active monitoring in the residential testbed.
+The Main benchmark campaign is the primary experimental dataset of this thesis. It comprises seven sessions (`G` through `M`) covering $175,578\text{ raw CSI frames}$ and $100.5\text{ minutes}$ of total recording time ($157,211\text{ frames}$ and $90.0\text{ minutes}$ of strictly ground-truth active monitoring) in the residential testbed.
 
 ```text
   Session Timeline Overview (September 22-23, 2026):
@@ -166,7 +166,7 @@ Every captured session was verified across transmission and data structure param
 | **Median Rate ($f_{\text{med}}$)** | $29.36\text{ Hz}$ | $29.36\text{ Hz}$ | $29.36\text{ Hz}$ | $29.36\text{ Hz}$ | $29.36\text{ Hz}$ | $29.36\text{ Hz}$ | $29.36\text{ Hz}$ |
 | **Jitter $\sigma_{\Delta t}$** | $4.63\text{ ms}$ | $5.28\text{ ms}$ | $5.79\text{ ms}$ | $4.59\text{ ms}$ | $5.34\text{ ms}$ | $3.93\text{ ms}$ | $4.37\text{ ms}$ |
 | **Packet Loss Rate** | $0.03\%$ | $0.18\%$ | $0.18\%$ | $0.07\%$ | $0.07\%$ | $0.01\%$ | $0.01\%$ |
-| **Packet Gaps ($>83.3\text{ ms}$)**| 3 events | 18 events | 19 events | 20 events | 7 events | 2 events | 2 events |
+| **Packet Gaps ($>83.3\text{ ms}$)**| 4 events | 18 events | 19 events | 20 events | 7 events | 2 events | 2 events |
 | **Mean RSSI** | $-26.47\text{ dBm}$ | $-26.49\text{ dBm}$ | $-35.59\text{ dBm}$ | $-27.00\text{ dBm}$ | $-36.34\text{ dBm}$ | $-27.13\text{ dBm}$ | $-29.31\text{ dBm}$ |
 | **RSSI Std ($\sigma_{\text{RSSI}}$)**| $0.50\text{ dBm}$ | $0.66\text{ dBm}$ | $1.02\text{ dBm}$ | $0.03\text{ dBm}$ | $0.91\text{ dBm}$ | $0.33\text{ dBm}$ | $0.52\text{ dBm}$ |
 | **Valid Subcarriers** | 166 / 192 | 166 / 192 | 166 / 192 | 166 / 192 | 165 / 192 | 166 / 192 | 166 / 192 |
@@ -188,7 +188,7 @@ The exploratory notebook [`eda_main.ipynb`](file:///home/xavier/dev/wifi-csi-pre
 ### 6.2 Plot 2: CSI Amplitude Profile per Subcarrier
 - **Artifact:** [`outputs/main/plot2_amplitude_per_subcarrier.png`](file:///home/xavier/dev/wifi-csi-presence-detection/outputs/main/plot2_amplitude_per_subcarrier.png)
 - **Spectral Analysis:** Displays the mean frequency response $\mu_k = \frac{1}{N}\sum |H_t(k)|$ across all 192 subcarriers in two panels: individual sessions (top) and aggregated by condition (bottom).
-  - **Band Edges & Nulls:** Subcarriers $0 - 5$ and $186 - 191$ drop to zero (guard bands). The central DC notch appears around subcarrier index 64 in the baseband mapping.
+  - **Band Edges & Nulls:** Subcarriers $0 - 5$ (lower band edge), subcarrier $32$, subcarriers $59 - 65$ (clustering around the baseband DC notch at index $64$), subcarriers $123 - 133$ (mid-band channel bonding transition nulls), and subcarrier $191$ (upper band edge) register zero or near-zero amplitude, constituting the $26\text{ dead subcarriers}$ (leaving $166\text{ valid subcarriers}$).
   - **Frequency-Selective Fading:** The indoor multipath channel creates distinct constructive peaks and destructive notches across the spectrum. Empty sessions (`G`, `J`, `L`) exhibit overlapping spectral curves, demonstrating that the static channel profile is stable over multiple hours.
   - **Spatial Deformation:** Occupied positions reshape the spectral envelope. Position P2 (near TX) and P3 (near RX) cause broad attenuation across all subcarriers, while off-LoS positions (P1, P4) alter specific subcarrier clusters where multipath reflections interfere constructively or destructively.
 
