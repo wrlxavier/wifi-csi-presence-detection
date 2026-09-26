@@ -7,8 +7,8 @@
 Exploratory Data Analysis (EDA) forms the empirical foundation of this thesis, bridging physical layer wireless phenomena and downstream statistical learning. Channel State Information (CSI) recorded over IEEE 802.11n Orthogonal Frequency-Division Multiplexing (OFDM) channels produces high-dimensional, time-varying complex matrices representing channel frequency responses across multiple subcarriers. Before committing to digital filtering, statistical feature extraction, and supervised classification, the underlying radio channel behavior must be systematically characterized.
 
 The EDA phase was conducted incrementally across three experimental milestones:
-1. **Initial Feasibility Validation ([`eda_first_test.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_first_test.ipynb)):** Validated the foundational hardware communication link, verified high-speed serial decoding integrity, inspected raw phase unwrapping properties, and confirmed the primary detection hypothesis in 802.11n HT20 mode ($20\text{ MHz}$ bandwidth) using a Cohen's $d$ effect-size proxy ($d = 25.427$).
-2. **Controlled Pilot Campaign ([`eda_pilot.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_pilot.ipynb)):** Scaled the radio link to 802.11n HT40 mode ($40\text{ MHz}$ bandwidth, 192 reported subcarriers), evaluated transmission stability across four 11.5-minute sessions (`C` through `F`), quantified the effects of human motion versus static presence on packet arrival jitter, and established objective pass/fail criteria for data ingestion.
+1. **Initial Feasibility Validation ([`eda_first_test.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_first_test.ipynb)):** Validated the foundational hardware communication link, verified high-speed serial decoding integrity, inspected raw phase unwrapping properties, and confirmed the primary detection hypothesis in initial 802.11n HT40 transmission (yielding 192 reported complex subcarrier bins, despite legacy metadata template defaults indicating HT20/Ch 6) using a Cohen's $d$ effect-size proxy ($d = 25.427$).
+2. **Controlled Pilot Campaign ([`eda_pilot.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_pilot.ipynb)):** Standardized and formalized the radio link protocol in 802.11n HT40 mode on Channel 11 ($40\text{ MHz}$ bandwidth, 192 reported subcarriers), evaluated transmission stability across four 11.5-minute sessions (`C` through `F`), quantified the effects of human motion versus static presence on packet arrival jitter, and established objective pass/fail criteria for data ingestion.
 3. **Multi-Position Benchmark Campaign ([`eda_main.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_main.ipynb)):** Executed an exhaustive investigation across seven systematically orchestrated sessions (`G` through `M`, totaling $175,578\text{ raw CSI frames}$ across $100.5\text{ minutes}$ of capture time, spanning over $7.5\text{ hours}$ of wall-clock operational execution). This stage established the physical inadequacy of RSSI in off-Line-of-Sight (off-LoS) scenarios, mapped subcarrier-by-subcarrier variance response, demonstrated long-term channel stationarity over a 7-hour period, and confirmed full project viability across a 4-point quality checklist.
 
 ---
@@ -72,39 +72,39 @@ To visualize time series across 192 subcarriers without visual clutter or arbitr
 
 ## 3. Phase I: Initial Feasibility & Sanity Validation ([`eda_first_test.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_first_test.ipynb))
 
-The First Test campaign evaluated two initial 60-second exploratory sessions (`PLA` and `PLB`) recorded in IEEE 802.11n HT20 mode on Channel 6 ($2437\text{ MHz}$, $20\text{ MHz}$ bandwidth).
+The First Test campaign evaluated two initial 60-second exploratory sessions (`PLA` and `PLB`) recorded on Channel 11 ($2462\text{ MHz}$, $40\text{ MHz}$ bandwidth; companion JSON sidecars contained legacy template labels of Channel 6 / HT20).
 
 ```mermaid
 flowchart TD
     A["Raw First Test Dumps<br/>PLA (Empty) & PLB (Occupied)"] --> B["Serial Integrity Check<br/>1,735 Frames / Session @ 28.9 Hz"]
-    B --> C["Physical Layer Inspection<br/>802.11n HT20 (20 MHz, Ch 6)"]
+    B --> C["Physical Layer Inspection<br/>802.11n HT40 (192 Subcarriers)<br/>Legacy JSON: Ch 6 / HT20"]
     C --> D1["Temporal Stability<br/>Zero Packet Loss (0.00%)<br/>Jitter < 6 ms"]
     C --> D2["Spectral Separability<br/>Cohen's d Proxy = 25.427<br/>Large Effect Size"]
     C --> D3["Phase vs Amplitude<br/>Phase Unwrapping Evaluated<br/>Hardware CFO/SFO Drift Identified"]
-    D1 & D2 & D3 --> E["Viability Verdict:<br/>PASSED — Advance to HT40 Campaign"]
+    D1 & D2 & D3 --> E["Viability Verdict:<br/>PASSED — Advance to Pilot Campaign"]
 ```
 
 ### 3.1 Experimental Configuration & Integrity
 
-- **Operating Parameters:** Primary Channel 6, $20\text{ MHz}$ bandwidth, nominal transmission rate $30\text{ Hz}$, $T_{\text{nominal}} = 33.33\text{ ms}$.
+- **Operating Parameters:** IEEE 802.11n HT40 mode on Channel 11 ($40\text{ MHz}$ bandwidth, yielding 192 complex subcarrier bins, though legacy prototype metadata recorded default template values of Channel 6 / HT20), nominal transmission rate $30\text{ Hz}$, $T_{\text{nominal}} = 33.33\text{ ms}$.
 - **Data Ingestion:** Both `PLA` (empty baseline) and `PLB` (occupied still) completed with exactly 1,735 and 1,736 rows respectively over a $60.0\text{ s}$ duration.
 - **Link Performance:**
   - Packet loss: $0.00\%$ ($0$ dropped packets).
   - Effective sampling rate: Mean rate of $28.92\text{ Hz}$ ($(N-1)/\Delta t_{\text{total}}$, a $3.6\%$ deviation from nominal $30\text{ Hz}$) and median instantaneous rate of $29.41 - 29.42\text{ Hz}$ ($1 / \text{median}(\Delta t)$), fully complying with the $\pm 10\%$ acceptance band.
-  - Null/corrupt rows: $0$ missing values; $100\%$ compliance on frame length (`len = 384` bytes).
+  - Null/corrupt rows: $0$ missing values; $100\%$ compliance on frame length (`len = 384` bytes, 192 complex subcarrier bins with 161–166 valid subcarriers).
 
 ### 3.2 Key Analytical Findings
 
 1. **Separability & Effect Size:** The Cohen's $d$ separability index reached $d = 25.427$, exceeding the benchmark threshold for a "large" statistical effect ($d > 0.8$) by more than an order of magnitude. This established that human presence introduces dramatic alterations to indoor multipath profiles.
 2. **Phase Dynamics vs. Amplitude Stability:** While unwrapped phase $\phi_{\text{unwrapped}}(k)$ exhibited distinct fluctuations during human presence, raw phase measurements suffered from severe linear ramp drifts. These drifts are caused by unsynchronized Carrier Frequency Offset (CFO) and Sampling Frequency Offset (SFO) between the independent local oscillators of the TX and RX nodes. Correcting these phase offsets requires multi-antenna conjugate multiplication or complex linear fit unwrapping, introducing latency. Conversely, the Euclidean amplitude $|H(k)|$ is inherently immune to carrier phase offsets, demonstrating high baseline stability. This supported the architectural choice to focus primary feature extraction on amplitude metrics.
 3. **Windowed MAD Activity Detector:** A 2.0-second sliding Mean Absolute Deviation (MAD) operator was evaluated on subcarrier amplitudes. In `PLA` (empty), MAD remained at a steady-state noise floor near zero. In `PLB` (occupied), MAD exhibited an immediate step increase, proving that sliding window dispersion metrics capture presence state transitions.
-4. **Viability Decision:** The test confirmed the stability of the hardware UART logging pipeline, validating progression to full $40\text{ MHz}$ HT40 data collection.
+4. **Viability Decision:** The test confirmed the stability of the hardware UART logging pipeline, validating progression to full controlled pilot collection.
 
 ---
 
 ## 4. Phase II: Controlled Pilot Campaign Analysis ([`eda_pilot.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_pilot.ipynb))
 
-The Pilot campaign scaled the sensing system to IEEE 802.11n HT40 channel bonding on Channel 11 ($2462\text{ MHz}$ primary, $2452\text{ MHz}$ center frequency, $40\text{ MHz}$ bandwidth). Four full-length ($690\text{ s}$) sessions were analyzed: `C` (empty), `D` (occupied still), `E` (occupied moving), and `F` (repeat empty).
+The Pilot campaign standardized and formalized the sensing protocol in IEEE 802.11n HT40 channel bonding on Channel 11 ($2462\text{ MHz}$ primary, $2452\text{ MHz}$ center frequency, $40\text{ MHz}$ bandwidth). Four full-length ($690\text{ s}$) sessions were analyzed: `C` (empty), `D` (occupied still), `E` (occupied moving), and `F` (repeat empty).
 
 ### 4.1 Ingestion & File Integrity Verification
 
@@ -143,13 +143,13 @@ The Main benchmark campaign is the primary experimental dataset of this thesis. 
 
 ```text
   Session Timeline Overview (September 22-23, 2026):
-  17:01 [Session G: Empty Baseline 1] (~11.5 min, 20,151 samples)
-  19:08 [Session H: Occupied P1 (Off-LoS West)] (~11.5 min, 19,984 samples)
-  19:32 [Session I: Occupied P2 (On-LoS Near TX)] (~11.5 min, 19,911 samples)
-  20:01 [Session J: Extended Empty Baseline] (~31.5 min, 55,075 samples)
-  23:53 [Session K: Occupied P3 (On-LoS Near RX)] (~11.5 min, 20,050 samples)
-  00:11 [Session L: Repeat Empty Baseline 2] (~11.5 min, 20,236 samples)
-  00:31 [Session M: Occupied P4 (Off-LoS East)] (~11.5 min, 20,171 samples)
+  17:01 [Session G: Empty Baseline 1] (t0 = 17:03, ~11.5 min, 20,151 samples)
+  19:08 [Session H: Occupied P1 (Off-LoS West)] (t0 = 19:11, ~11.5 min, 19,984 samples)
+  19:32 [Session I: Occupied P2 (On-LoS Near TX)] (t0 = 19:33, ~11.5 min, 19,911 samples)
+  20:00 [Session J: Extended Empty Baseline] (t0 = 20:01, ~31.5 min, 55,075 samples)
+  23:51 [Session K: Occupied P3 (On-LoS Near RX)] (t0 = 23:53, ~11.5 min, 20,050 samples)
+  00:09 [Session L: Repeat Empty Baseline 2] (t0 = 00:11, ~11.5 min, 20,236 samples)
+  00:26 [Session M: Occupied P4 (Off-LoS East)] (t0 = 00:31, ~11.5 min, 20,171 samples)
 ```
 
 ### 5.1 Dataset Integrity & Link Quality Matrix
@@ -194,7 +194,7 @@ The exploratory notebook [`eda_main.ipynb`](file:///home/xavier/dev/wifi-csi-pre
 
 ### 6.3 Plot 3: CSI Amplitude vs. Time (8 Representative Subcarriers)
 - **Artifact:** [`outputs/main/plot3_amplitude_vs_time_subcarriers.png`](file:///home/xavier/dev/wifi-csi-presence-detection/outputs/main/plot3_amplitude_vs_time_subcarriers.png)
-- **Temporal Analysis:** Visualizes eight automatically selected subcarriers across the full $690\text{ s}$ duration of each session, with dashed vertical markers denoting $t_1$ (end of stabilization) and $t_2$ (end of active condition window).
+- **Temporal Analysis:** Visualizes eight automatically selected subcarriers across the full recording duration of each session ($690.0\text{ s}$ for standard sessions, and $1,889.9\text{ s} \approx 31.5\text{ min}$ for extended baseline Session J), with dashed vertical markers denoting $t_1$ (end of stabilization) and $t_2$ (end of active condition window).
   - The plots confirm that subcarrier trajectories in empty sessions are smooth, laminar, and stationary.
   - In occupied sessions, the trajectories exhibit sustained high-frequency fluctuations. Even during "motionless" occupancy, physiological respiration and involuntary micro-movements induce measurable variance on sensitive subcarriers.
 
@@ -210,18 +210,18 @@ The exploratory notebook [`eda_main.ipynb`](file:///home/xavier/dev/wifi-csi-pre
   1. *30-Second Rolling Mean (Session J - 31.5 min):* Traces for 5 representative subcarriers show horizontal trajectories with drift bounded within $\pm 0.5$ amplitude units across half an hour.
   2. *Unwrapped Phase Stability (Session J):* Confirms continuity without discrete cycle slips during unoccupied states, but demonstrates continuous cumulative drift spanning over $2,000\text{ radians}$ (from $0$ to $\approx -2,000\text{ rad}$) over 31.5 minutes due to unsynchronized hardware oscillator frequency offsets (CFO/SFO) and thermal wander. This provides direct empirical proof for why raw phase cannot be used directly without complex calibration, validating the choice of Euclidean amplitude.
   3. *Cumulative Standard Deviation Convergence:* Tracing $\sigma_{\text{cum}}(t) = \sqrt{\frac{1}{t}\sum_{\tau=1}^t (A(\tau) - \bar{A}_t)^2}$ reveals that subcarrier variance converges within the first $30 - 45\text{ seconds}$, confirming that the 60-second stabilization interval ($T_{\text{stab}} = 60\text{ s}$) is sufficient for link convergence.
-  4. *Cross-Session Empty Consistency:* Compares mean spectral profiles across Session G (17:01), Session J (20:00), and Session L (00:09). Profiles for Session J and Session L—collected 4.5 hours apart—overlay almost identically across all valid subcarriers with an overall mean amplitude difference of only $\sim 1.1\%$ ($24.91$ vs. $25.19$, per-subcarrier delta $< 2.9\%$), establishing excellent long-term channel stationarity. Session G shares the identical frequency-selective profile shape (matching constructive peaks and destructive notches) but exhibits an elevated global amplitude scale ($35.71$), reflecting the initial RF frontend automatic gain control (AGC) operating point prior to extended continuous collection.
+  4. *Cross-Session Empty Consistency:* Compares mean spectral profiles across Session G (17:01), Session J (20:00), and Session L (00:09). Profiles for Session J and Session L—collected 4.5 hours apart—overlay almost identically across all valid subcarriers with an overall mean amplitude difference of only $\sim 1.1\%$ ($24.91$ vs. $25.19$, mean per-subcarrier delta of $2.85\%$, maximum delta $< 9.0\%$), establishing excellent long-term channel stationarity. Session G shares the identical frequency-selective profile shape (matching constructive peaks and destructive notches) but exhibits an elevated global amplitude scale ($35.71$), reflecting the initial RF frontend automatic gain control (AGC) operating point prior to extended continuous collection.
 
 ### 6.6 Plot 6: Inter-Packet Arrival Intervals & Transmission Jitter
 - **Artifact:** [`outputs/main/plot6_interpacket_intervals.png`](file:///home/xavier/dev/wifi-csi-presence-detection/outputs/main/plot6_interpacket_intervals.png)
 - **Timing Distribution Analysis:** Plots 80-bin histograms of $\Delta t$ for each session, annotated with the nominal interval line ($33.33\text{ ms}$) and the packet gap threshold ($83.33\text{ ms}$).
   - Across all sessions, the distribution forms a sharp Gaussian-like peak centered between $33.8\text{ ms}$ and $34.2\text{ ms}$.
-  - Over $99.8\%$ of all packet intervals fall below the $83.33\text{ ms}$ gap threshold. Packet gap events occurred at most 20 times per session ($0.03\% - 0.18\%$ of total frames), demonstrating the reliability of the 921,600 baud serial transport.
+  - Over $99.8\%$ of all packet intervals fall below the $83.33\text{ ms}$ gap threshold. Packet gap events occurred at most 20 times per session ($0.01\% - 0.18\%$ of total frames across all sessions, with Sessions L and M exhibiting only $0.01\%$), demonstrating the reliability of the 921,600 baud serial transport.
 
 ### 6.7 Plot 7: Noisy & Anomalous Subcarrier Identification
 - **Artifact:** [`outputs/main/plot7_noisy_subcarriers.png`](file:///home/xavier/dev/wifi-csi-presence-detection/outputs/main/plot7_noisy_subcarriers.png)
 - **Noise Analysis:** Evaluates the baseline noise profile of Session G across two metrics:
-  - *Coefficient of Variation ($\text{CV}_k$):* The 90th percentile threshold was calculated at $\text{CV}_{\text{thresh}} = 0.091$ ($\approx 0.0908$). Exactly $17\text{ subcarriers}$ (index 15, and indices 134–142, 144, 146–147, 149–150) were flagged as noisy ($CV > p_{90}$).
+  - *Coefficient of Variation ($\text{CV}_k$):* The 90th percentile threshold was calculated at $\text{CV}_{\text{thresh}} = 0.091$ ($\approx 0.0908$). Exactly $17\text{ subcarriers}$ (index 15, and indices 134–143 and 145–150, i.e., all indices from 134 to 150 except 144) were flagged as noisy ($CV > p_{90}$).
   - *Fisher Excess Kurtosis ($\gamma_{2, k}$):* An impulsiveness threshold of $|\gamma_2| > 5.0$ flagged $23\text{ subcarriers}$ (clustering from subcarrier 136 through 161, with an isolated outlier at index 173).
   - *Spatial Distribution of Noisy Carriers:* The flagged indices cluster prominently around subcarriers $134 - 155$. In 802.11n HT40 channel bonding, these indices map to the internal transition band between the two bonded 20 MHz primary and secondary channels, where baseband filter roll-off introduces higher variance and lower signal-to-noise ratio. Subcarrier 15 also shows elevated CV near the lower band edge.
 
@@ -242,7 +242,7 @@ The exploratory notebook [`eda_main.ipynb`](file:///home/xavier/dev/wifi-csi-pre
 - **Discriminability Analysis:** Provides the physical justification for using dispersion features:
   - *Panel 1 (Absolute Variance):* Compares per-subcarrier temporal variance $\sigma_k^2$ for the averaged Empty baseline against positions P1, P2, P3, and P4 across the 165 shared valid subcarriers. The averaged empty baseline exhibits low variance on lower subcarriers ($\sigma^2 \approx 0.33 - 0.50$ on indices 6–57) and moderate variance ($\sigma^2 \approx 3.5 - 8.18$, median $3.68$) on bonded carriers. In contrast, occupied positions induce substantial dynamic variance excursions, peaking at $12.81$ (P1, Session H), $7.92$ (P2, Session I), $9.29$ (P3, Session K), and $7.28$ (P4, Session M).
   - *Panel 2 (Variance Ratio / Sensitivity):* Computes the spatial discriminability ratio $R_k = \sigma_{k, \text{occ}}^2 / \max(\sigma_{k, \text{empty}}^2, 10^{-4})$.
-  - *Off-LoS Perturbation vs. On-LoS Attenuation:* In Position P1 (Off-LoS West, Session H)—where RSSI showed virtually zero attenuation ($\Delta\text{RSSI} = -0.02\text{ dBm}$)—the variance ratio $R_k$ remains elevated across virtually the entire spectrum, averaging $1.97$ and peaking at $2.57\times$ the empty baseline. Because the direct path remains unobstructed, carrier power is preserved while human micro-movements continuously scatter multipath rays. In contrast, for on-LoS positions (P2, P3), torso absorption suppresses total carrier power so heavily that absolute variance on several subcarriers dips below empty baseline ($R_k$ down to $0.27 - 0.31$), while sensitive multipath subcarriers still peak at $1.65\times$ and $2.10\times$.
+  - *Off-LoS Perturbation vs. On-LoS Attenuation:* In Position P1 (Off-LoS West, Session H)—where RSSI showed virtually zero attenuation ($\Delta\text{RSSI} = -0.02\text{ dBm}$)—the variance ratio $R_k$ remains elevated across virtually the entire spectrum, exhibiting a median ratio of $1.97$ (mean $1.85$) and peaking at $2.57\times$ the empty baseline. Because the direct path remains unobstructed, carrier power is preserved while human micro-movements continuously scatter multipath rays. In contrast, for on-LoS positions (P2, P3), torso absorption suppresses total carrier power so heavily that absolute variance on several subcarriers dips below empty baseline ($R_k$ down to $0.27 - 0.31$), while sensitive multipath subcarriers still peak at $1.65\times$ and $2.10\times$.
 
 ---
 
@@ -298,9 +298,9 @@ To ensure data integrity, every session was evaluated against four quantitative 
 
 | Campaign | Evaluated Sessions | Packet Loss Status | Rate Stability Status | RSSI Stability Status | Subcarrier Count Status | Automated Quality Verdict |
 | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
-| **First Test** | PLA, PLB | PASSED ($0.00\%$) | PASSED ($28.9\text{ Hz}$) | PASSED ($\sigma < 0.5\text{ dB}$) | PASSED ($192\text{ raw}$) | **APPROVED** (Pilot Feasibility Confirmed) |
-| **Pilot** | C, D, E, F | PASSED ($0.00 - 2.33\%$) | PARTIAL ($26.16 - 29.33\text{ Hz}$)* | PASSED ($\sigma < 4.20\text{ dB}$) | PASSED ($166\text{ valid}$) | **APPROVED WITH RESTRICTIONS** (Motivated Multi-Position Setup) |
-| **Main** | G, H, I, J, K, L, M | **PASSED** ($< 0.18\%$) | **PASSED** ($28.86 - 29.33\text{ Hz}$) | **PASSED** ($\sigma \le 1.02\text{ dB}$) | **PASSED** ($165\text{ shared}$) | **FULLY APPROVED** (Proceed to Feature Pipeline) |
+| **First Test** | PLA, PLB | PASSED ($0.00\%$) | PASSED ($28.9\text{ Hz}$) | PASSED ($\sigma \le 1.28\text{ dB}$) | PASSED ($161 - 166\text{ valid}$) | **APPROVED** (Pilot Feasibility Confirmed) |
+| **Pilot** | C, D, E, F | PASSED ($0.00 - 2.33\%$) | PARTIAL ($26.16 - 29.33\text{ Hz}$)* | PASSED ($\sigma < 4.20\text{ dB}$) | PASSED ($162 - 166\text{ valid}$) | **APPROVED WITH RESTRICTIONS** (Motivated Multi-Position Setup) |
+| **Main** | G, H, I, J, K, L, M | **PASSED** ($0.01 - 0.18\%$) | **PASSED** ($28.86 - 29.33\text{ Hz}$) | **PASSED** ($\sigma \le 1.02\text{ dB}$) | **PASSED** ($165\text{ shared}$) | **FULLY APPROVED** (Proceed to Feature Pipeline) |
 
 *\*Note on Pilot Campaign:* Sessions D and E experienced slight rate drops below the $27.0\text{ Hz}$ boundary ($26.16\text{ Hz}$ and $26.97\text{ Hz}$) due to human motion shadowing directly on the antenna baseline, which informed placement procedures for the Main dataset.
 
@@ -311,9 +311,10 @@ To ensure data integrity, every session was evaluated against four quantitative 
 The findings from this exploratory phase establish several direct specifications for the downstream pipeline:
 
 1. **Subcarrier Masking Specification:**
-   - 26 subcarriers must be discarded permanently as dead carriers (guard bands and DC subcarrier).
-   - A shared valid subcarrier mask of 162 subcarriers (across Pilot C-F and Main G-M) or 165 subcarriers (Main G-M) must be used.
-   - Subcarriers exhibiting extreme baseband transition noise ($134 - 145$) should either be filtered or evaluated during feature minimization.
+   - Out of the 192 reported bins, baseline dead subcarriers (guard bands and DC notch) account for 26 discarded carriers in standard clean sessions.
+   - Across the Main campaign (Sessions G–M), Session K attenuates subcarrier 58 below threshold, establishing a shared valid mask of 165 subcarriers (27 discarded).
+   - Across the combined Pilot (C–F) and Main (G–M) pipeline, 30 dead/null subcarriers are permanently discarded to establish a shared valid subcarrier mask of 162 subcarriers.
+   - Subcarriers exhibiting extreme baseband transition noise (indices 134–150) should either be filtered or evaluated during feature minimization.
 2. **Windowing Duration Justification:**
    - Given an effective sampling rate of $29.0\text{ Hz}$, a window size of $T_w = 2.0\text{ seconds}$ yields approximately $58\text{ samples/window}$.
    - This provides sufficient sample support for computing statistical dispersion metrics (Variance, MAD, Range, IQR) while maintaining responsiveness for presence detection.
