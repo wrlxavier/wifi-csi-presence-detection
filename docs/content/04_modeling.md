@@ -133,7 +133,7 @@ models/registry/{model}_bundle/
 ├── pipeline.joblib          # Scikit-learn Pipeline (StandardScaler + Model)
 └── model_card.json          # Machine-readable metadata (hyperparameters, training provenance)
 ```
-This architecture allows live inference scripts (e.g. [`realtime_presence.py`](file:///home/xavier/dev/wifi-csi-presence-detection/scripts/realtime_presence.py)) to load an operational pipeline in a single call via [`load_model_bundle`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/models/serialization.py#L42-L73).
+This architecture allows live inference scripts (e.g. [`realtime_presence.py`](file:///home/xavier/dev/wifi-csi-presence-detection/scripts/realtime_presence.py)) to load an operational pipeline in a single call via [`load_model_bundle`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/models/serialization.py#L79-L94).
 
 ---
 
@@ -196,23 +196,23 @@ Evaluating predictions across individual sessions confirms consistent classifica
 
 | Campaign | Session ID | Condition Label | Test Windows ($n$) | Accuracy | Macro $F_1$ | False Alarm Rate |
 | :---: | :---: | :--- | :---: | :---: | :---: | :---: |
-| `pilot` | **C** | `empty` | 35 | **$97.14\%$** | $0.4928$* | $2.86\%$ ($1/35$) |
-| `pilot` | **D** | `occupied_still` | 31 | **$100.00\%$** | $1.0000$ | $0.00\%$ |
-| `pilot` | **E** | `occupied_moving` | 48 | **$100.00\%$** | $1.0000$ | $0.00\%$ |
-| `pilot` | **F** | `empty` | 40 | **$100.00\%$** | $1.0000$ | $0.00\%$ |
-| `main` | **G** | `empty` | 53 | **$100.00\%$** | $1.0000$ | $0.00\%$ |
-| `main` | **H** | `occupied_p1_still` | 50 | **$92.00\%$** | $0.4792$* | $0.00\%$ |
-| `main` | **I** | `occupied_p2_still` | 46 | **$100.00\%$** | $1.0000$ | $0.00\%$ |
-| `main` | **J** | `empty` (extended) | 139 | **$100.00\%$** | $1.0000$ | $0.00\%$ |
-| `main` | **K** | `occupied_p3_still` | 48 | **$100.00\%$** | $1.0000$ | $0.00\%$ |
-| `main` | **L** | `empty` | 48 | **$100.00\%$** | $1.0000$ | $0.00\%$ |
-| `main` | **M** | `occupied_p4_still` | 46 | **$97.83\%$** | $0.4945$* | $0.00\%$ |
+| `pilot` | **C** | `empty` | 38 | **$100.00\%$** | $1.0000$ | $0.00\%$ ($0/38$) |
+| `pilot` | **D** | `occupied_still` | 40 | **$100.00\%$** | $1.0000$ | $0.00\%$ |
+| `pilot` | **E** | `occupied_moving` | 42 | **$100.00\%$** | $1.0000$ | $0.00\%$ |
+| `pilot` | **F** | `empty` | 39 | **$100.00\%$** | $1.0000$ | $0.00\%$ ($0/39$) |
+| `main` | **G** | `empty` | 50 | **$100.00\%$** | $1.0000$ | $0.00\%$ ($0/50$) |
+| `main` | **H** | `occupied_p1_still` | 44 | **$93.18\%$** | $0.4824$* | $0.00\%$ |
+| `main` | **I** | `occupied_p2_still` | 49 | **$100.00\%$** | $1.0000$ | $0.00\%$ |
+| `main` | **J** | `empty` (extended) | 128 | **$100.00\%$** | $1.0000$ | $0.00\%$ ($0/128$) |
+| `main` | **K** | `occupied_p3_still` | 51 | **$100.00\%$** | $1.0000$ | $0.00\%$ |
+| `main` | **L** | `empty` | 60 | **$100.00\%$** | $1.0000$ | $0.00\%$ ($0/60$) |
+| `main` | **M** | `occupied_p4_still` | 44 | **$100.00\%$** | $1.0000$ | $0.00\%$ |
 
 *\*Metric Note on Single-Class Slices:* In subsets containing samples from only one ground-truth class (e.g. Session H with only class 1), unweighted Macro F1 averages across both classes; with zero support for the absent class, the mathematical maximum is $\approx 0.50$. The operational metric on single-class slices is **Accuracy**:
-- **100% Accuracy:** Achieved in 8 out of 11 sessions (`D`, `E`, `F`, `G`, `I`, `J`, `K`, `L`).
-- **Off-LoS West (Session H):** $92.00\%$ accuracy ($46$ of $50$ windows correctly classified).
-- **Off-LoS East (Session M):** $97.83\%$ accuracy ($45$ of $46$ windows correctly classified).
-- **Extended Empty Baseline (Session J):** $100.00\%$ accuracy across all $139$ test windows, demonstrating zero baseline false alarms over a 31.5-minute duration.
+- **100% Accuracy:** Achieved in 10 out of 11 sessions (`C`, `D`, `E`, `F`, `G`, `I`, `J`, `K`, `L`, `M`).
+- **Off-LoS West (Session H):** $93.18\%$ accuracy ($41$ of $44$ windows correctly classified, accounting for the only 3 missed detections in the entire test set).
+- **Off-LoS East (Session M):** $100.00\%$ accuracy ($44$ of $44$ windows correctly classified).
+- **Extended Empty Baseline (Session J):** $100.00\%$ accuracy across all $128$ test windows, demonstrating zero baseline false alarms over a 31.5-minute continuous recording.
 
 ### 6.2 Per-Condition Spatial Robustness
 
@@ -220,22 +220,23 @@ Aggregating test predictions across spatial locations demonstrates the system's 
 
 | Presence Condition | Physical Position / Kinematics | Test Windows ($n$) | Classification Accuracy | False Alarm Rate |
 | :--- | :--- | :---: | :---: | :---: |
-| **`empty`** | Unoccupied room baseline | 315 | **$99.68\%$** ($314/315$) | **$0.32\%$** |
-| **`occupied_still`** | On-LoS Center Mark, motionless | 31 | **$100.00\%$** ($31/31$) | $0.00\%$ |
-| **`occupied_moving`** | On-LoS Center Mark, moving $\pm 0.30\text{ m}$ | 48 | **$100.00\%$** ($48/48$) | $0.00\%$ |
-| **`occupied_p1_still`**| Off-LoS West ($30\text{ cm}$ off axis) | 50 | **$92.00\%$** ($46/50$) | $0.00\%$ |
-| **`occupied_p2_still`**| On-LoS Near TX ($30\text{ cm}$ from TX) | 46 | **$100.00\%$** ($46/46$) | $0.00\%$ |
-| **`occupied_p3_still`**| On-LoS Near RX ($30\text{ cm}$ from RX) | 48 | **$100.00\%$** ($48/48$) | $0.00\%$ |
-| **`occupied_p4_still`**| Off-LoS East ($30\text{ cm}$ off axis, wardrobe) | 46 | **$97.83\%$** ($45/46$) | $0.00\%$ |
+| **`empty`** | Unoccupied room baseline | 315 | **$100.00\%$** ($315/315$) | **$0.00\%$** |
+| **`occupied_still`** | On-LoS Center Mark, motionless | 40 | **$100.00\%$** ($40/40$) | $0.00\%$ |
+| **`occupied_moving`** | On-LoS Center Mark, moving $\pm 0.30\text{ m}$ | 42 | **$100.00\%$** ($42/42$) | $0.00\%$ |
+| **`occupied_p1_still`**| Off-LoS West ($30\text{ cm}$ off axis) | 44 | **$93.18\%$** ($41/44$) | $0.00\%$ |
+| **`occupied_p2_still`**| On-LoS Near TX ($30\text{ cm}$ from TX) | 49 | **$100.00\%$** ($49/49$) | $0.00\%$ |
+| **`occupied_p3_still`**| On-LoS Near RX ($30\text{ cm}$ from RX) | 51 | **$100.00\%$** ($51/51$) | $0.00\%$ |
+| **`occupied_p4_still`**| Off-LoS East ($30\text{ cm}$ off axis, wardrobe) | 44 | **$100.00\%$** ($44/44$) | $0.00\%$ |
 
 - **On-LoS Robustness:** 100% detection accuracy across all direct path locations (near TX, center still, center moving, near RX).
-- **Off-LoS Robustness:** $92.0\%$ accuracy on P1 and $97.8\%$ on P4. Because Session H exhibited zero RSSI attenuation during EDA ($\Delta \text{RSSI} = 0.02\text{ dB}$), achieving 92% detection confirms that CSI dispersion features capture human presence in areas blind to RSSI.
+- **Off-LoS Robustness:** $93.18\%$ accuracy on P1 and $100.00\%$ on P4. Because Session H exhibited zero RSSI attenuation during EDA ($\Delta \text{RSSI} = 0.02\text{ dB}$), achieving $>93\%$ detection confirms that CSI dispersion features capture human presence in areas blind to RSSI.
 
 ### 6.3 Time-of-Day Diurnal Stability
 
 Evaluating performance by collection period confirms that circadian environmental changes (temperature shifts, external network traffic) do not degrade classification:
-- **Afternoon Sessions ($n = 207$, 12:00 to 18:00):** Accuracy = **$99.52\%$**, Macro $F_1 = \mathbf{0.9949}$, $\text{FAR} = 0.78\%$.
-- **Night Sessions ($n = 377$, 19:00 to 01:00):** Accuracy = **$98.67\%$**, Macro $F_1 = \mathbf{0.9867}$, $\text{FAR} = \mathbf{0.00\%}$.
+- **Morning Sessions ($n = 133$):** Accuracy = **$100.00\%$**, Macro $F_1 = \mathbf{1.0000}$, $\text{FAR} = \mathbf{0.00\%}$.
+- **Afternoon Sessions ($n = 209$):** Accuracy = **$100.00\%$**, Macro $F_1 = \mathbf{1.0000}$, $\text{FAR} = \mathbf{0.00\%}$.
+- **Evening/Night Sessions ($n = 243$):** Accuracy = **$98.77\%$**, Macro $F_1 = \mathbf{0.9876}$, $\text{FAR} = \mathbf{0.00\%}$.
 
 ---
 
@@ -269,10 +270,10 @@ xychart-beta
 ```
 
 - **The Stopping Criterion (1-SE Rule):** The minimal subcarrier subset $N^*$ is chosen according to:
-  $$\overline{\text{F1}}_{N^*} \ge \overline{\text{F1}}_{\text{full}} - \text{SE}(\text{F1}_{\text{full}}), \quad \text{where } \text{SE} = \frac{\sigma_{\text{folds}}}{\sqrt{K}}$$
-  - Full model baseline session CV: $\overline{\text{F1}}_{\text{full}} = 0.5606 \pm 0.1124$, yielding $\text{SE} = 0.0503$.
-  - 1-SE stopping threshold: $0.5606 - 0.0503 = 0.5103$.
-  - At $N^* = 5\text{ subcarriers}$ (20 features), out-of-fold session CV Macro $F_1$ reaches **$0.6474$**—substantially exceeding the full baseline.
+  $$\overline{\text{F1}}_{N^*} \ge \max\left(\overline{\text{F1}}_{\text{full}} - \text{SE}(\text{F1}_{\text{full}}), \; \overline{\text{F1}}_{\text{full}} - 0.01\right)$$
+  - Full model baseline session CV: $\overline{\text{F1}}_{\text{full}} = 0.5606$, $\text{SE}_{\text{folds}} = 0.1124$.
+  - 1-SE stopping threshold: $0.5606 - 0.1124 = 0.4482$ (operational 1% tolerance threshold: $0.5606 - 0.0100 = 0.5506$).
+  - At $N^* = 5\text{ subcarriers}$ (20 features), out-of-fold session CV Macro $F_1$ reaches **$0.6474$**—comfortably exceeding both thresholds ($0.4482$ and $0.5506$).
 - **Why Pruning Improves Cross-Session Generalization:** In multi-session indoor sensing, retaining all 162 subcarriers allows models to overfit to static multipath profiles unique to individual recordings. Pruning to the 5 most informative carriers forces classifiers to focus on primary presence-induced disruptions, improving cross-session generalizability.
 
 ### 7.4 The Optimal 5 Subcarriers

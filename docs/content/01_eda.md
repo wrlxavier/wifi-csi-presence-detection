@@ -17,7 +17,7 @@ The EDA phase was conducted incrementally across three experimental milestones:
 
 ### 2.1 Signal Decoding & Complex Channel Transformation
 
-Each captured frame yields an array $\mathbf{D} \in \mathbb{Z}^{384}$ of signed 8-bit integers representing $N_{\text{sub}} = 192$ complex subcarrier channel response pairs. As implemented in [`raw_iq_to_complex`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/csi_decoder.py#L56-L65), the complex Channel Frequency Response (CFR) vector $\mathbf{H} \in \mathbb{C}^{192}$ is reconstructed for each subcarrier index $k \in \{0, 1, \dots, 191\}$ via:
+Each captured frame yields an array $\mathbf{D} \in \mathbb{Z}^{384}$ of signed 8-bit integers representing $N_{\text{sub}} = 192$ complex subcarrier channel response pairs. As implemented in [`raw_iq_to_complex`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/csi_decoder.py#L56-L64), the complex Channel Frequency Response (CFR) vector $\mathbf{H} \in \mathbb{C}^{192}$ is reconstructed for each subcarrier index $k \in \{0, 1, \dots, 191\}$ via:
 
 $$H(k) = I_k + j \cdot Q_k = \mathbf{D}[2k + 1] + j \cdot \mathbf{D}[2k]$$
 

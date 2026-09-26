@@ -70,12 +70,11 @@ where $C$ is the number of classes, $N_c$ is the sample count in class $c$, $\bo
 Principal Component Analysis performed on the standardized 648-dimensional feature space ([`outputs/pilot/figures/sep_01_pca.png`](file:///home/xavier/dev/wifi-csi-presence-detection/outputs/pilot/figures/sep_01_pca.png)) demonstrates that the effective intrinsic dimensionality of the indoor Wi-Fi sensing channel is compact:
 
 ```mermaid
-pie title Cumulative Explained Variance by Principal Components
-    "PC1 (81.7%)" : 81.7
-    "PC2 (4.6%)" : 4.6
-    "PCs 3 to 10 (9.5%)" : 9.5
-    "PCs 11 to 50 (2.5%)" : 2.5
-    "Remaining 598 PCs (1.7%)" : 1.7
+xychart-beta
+    title "Explained Variance by Principal Components (%)"
+    x-axis ["PC1", "PC2", "PCs 3-10", "PCs 11-50", "Remaining 598"]
+    y-axis "Explained Variance (%)" 0 --> 100
+    bar [81.7, 4.6, 9.5, 2.5, 1.7]
 ```
 
 - **Scree Plot Analysis:** The first principal component (PC1) accounts for **81.7%** of total variance across all 648 features. The second component (PC2) accounts for **4.6%**, yielding a cumulative explained variance of **86.3%** across just two dimensions.

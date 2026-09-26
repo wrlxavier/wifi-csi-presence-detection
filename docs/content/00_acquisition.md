@@ -68,7 +68,7 @@ The primary benchmark testbed was deployed in a residential bedroom representati
   - Floor-to-ceiling height: $2.85\text{ m}$
   - Total floor area: $11.73\text{ m}^2$
   - Enclosed volume: $33.43\text{ m}^3$
-- **Boundary Construction:** Structural brick masonry walls finished with plaster; reinforced concrete floor slab and ceiling; single plywood interior door ($0.80\text{ m} \times 2.10\text{ m}$) situated on the east wall; iron-frame exterior window with glass panes on the north wall.
+- **Boundary Construction:** Structural brick masonry walls finished with plaster; reinforced concrete floor slab and ceiling; single plywood interior door ($0.80\text{ m} \times 2.10\text{ m}$) situated on the east wall; iron-frame exterior window with glass panes on the south wall.
 - **Interior Clutter & Multipath Scatterers:** Static domestic furniture including a standard double bed (fabric and wood frame), an MDF wardrobe with full-height mirrors, a wooden study desk, an office chair, and two wall-mounted bookshelf niches.
 
 The testbed adopts a 2D Cartesian coordinate frame $(x, y)$ with its origin $(0, 0)$ positioned at the northwest interior corner of the room:
@@ -80,17 +80,17 @@ The testbed adopts a 2D Cartesian coordinate frame $(x, y)$ with its origin $(0,
                         North Wall
   (0.0, 0.0) ┌─────────────────────────┐       (3.40, 0.0)
              │                         │     
-Plywood Door │        [RX Node]        │    
+ Plywood Door│        [RX Node]        │    
              │        (1.45, 1.14)     └─────┐
              │             │                 │
-             │             │                 │  
-  West Wall  │             │ 2.00 m LoS      │  East Wall
+             │             │                 │
+  West Wall  │             │ 2.00 m LoS      │ East Wall
              │             │                 │
              │        [TX Node]              │
              │        (1.45, 3.08)           │
              │                               │
   (0.0, 3.45)└───────────────────────────────┘ (3.40, 3.45)
-              South Wall (Iron & Glass Window)
+               South Wall (Iron & Glass Window)
 ```
 
 ### 2.4 Node Coordinates & Line-of-Sight Geometry
@@ -206,7 +206,7 @@ where for subcarrier index $k \in \{0, 1, 2, \dots, 191\}$:
 - Imaginary component ($Q_k$): $d_{2k} = \text{data}[2k]$
 - Real component ($I_k$): $d_{2k+1} = \text{data}[2k + 1]$
 
-As implemented in [`raw_iq_to_complex`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/csi_decoder.py#L56-L65):
+As implemented in [`raw_iq_to_complex`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/csi_decoder.py#L56-L64):
 ```python
 imag = raw[0::2]
 real = raw[1::2]
@@ -275,7 +275,7 @@ sequenceDiagram
 
 - **Host PC System Timestamp:** Host timestamps (`timestamp_host`) are acquired at serial line decode time via Python's `datetime.now().strftime("%Y%m%dT%H%M%S.%f")`, ensuring monotonic alignment with UTC-offset ISO-8601 timestamps in metadata sidecars.
 - **Hardware Timer Cross-Check:** The embedded `local_timestamp` field (ESP32 hardware timer) is periodically cross-referenced against `timestamp_host` to detect packet queuing or serial driver buffering delays.
-- **Midnight-Rollover Handling:** In sessions that traverse midnight UTC/local boundaries (such as Session K, spanning 23:53:51 to 00:05:21), the metadata parser [`get_active_interval_from_metadata`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/metadata_parser.py#L61-L73) detects $t_2 < t_1$ and adds a one-day offset:
+- **Midnight-Rollover Handling:** In sessions that traverse midnight UTC/local boundaries (such as Session K, spanning 23:53:51 to 00:05:21), the metadata parser [`get_active_interval_from_metadata`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/metadata_parser.py#L61-L72) detects $t_2 < t_1$ and adds a one-day offset:
   ```python
   if not pd.isna(start) and not pd.isna(end) and end < start:
       end = end + pd.Timedelta(days=1)
@@ -434,7 +434,7 @@ A core architectural contribution of sidecar metadata is the automated enforceme
 
 1. **Pilot Sessions A & B Invalidation:** During the pilot campaign, sessions A and B were invalidated (`status: "INVALID"`) because of discrepancies between user-configured $t_1, t_2$ timestamps and the physical start time $t_0$, resulting from manual clock entry before automation was finalized.
 2. **Generalization Session GG Invalidation:** During the outdoor generalization campaign, session GG was marked `INVALID` with the explicit reason `"Someone entered the area during the session"`, documenting an environmental protocol breach.
-3. **Automated Pipeline Rejection:** The downstream ingestion pipeline in [`discover_sessions`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/metadata_parser.py#L75-L115) and [`load_session_arrays`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/signal/amplitudes.py#L56-L75) checks `required_status = "VALID"`, automatically excluding compromised files from model training.
+3. **Automated Pipeline Rejection:** The downstream ingestion pipeline in [`discover_sessions`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/metadata_parser.py#L75-L114) and [`load_session_arrays`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/signal/amplitudes.py#L56-L213) checks `required_status = "VALID"`, automatically excluding compromised files from model training.
 
 ---
 
@@ -460,11 +460,11 @@ wifi-csi-presence-detection/
 
 ### 8.1 Key Software Components
 
-- **[`CSISerialReader`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/acquisition/serial_reader.py#L9-L83):** Encapsulates the PySerial connection. It initializes the UART interface, executes `reset_input_buffer()` to discard stale bytes, listens for incoming `CSI_DATA` lines, decodes UTF-8 strings with replacement handlers, and streams records directly to disk with periodic callbacks.
+- **[`CSISerialReader`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/acquisition/serial_reader.py#L9-L82):** Encapsulates the PySerial connection. It initializes the UART interface, executes `reset_input_buffer()` to discard stale bytes, listens for incoming `CSI_DATA` lines, decodes UTF-8 strings with replacement handlers, and streams records directly to disk with periodic callbacks.
 - **[`generate_session_metadata`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/acquisition/metadata_logger.py#L8-L65):** Enforces standardization of ISO-8601 timestamps, validates relative directory structures, attaches physical room geometries, and formats the companion metadata payload.
 - **[`find_serial_port`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/acquisition/realtime.py#L58-L87):** Implements automated hardware discovery by scanning system USB descriptors for ESP32 and USB-UART bridge identifiers (`CP210`, `CH340`, `FTDI`, `Silicon Labs`), falling back to `/dev/ttyUSB0` or `/dev/ttyACM0`.
-- **[`raw_iq_to_complex`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/csi_decoder.py#L56-L65):** Vectorized conversion of interleaved raw 8-bit integer buffers into NumPy 1D complex arrays ($I + jQ$).
-- **[`discover_sessions`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/metadata_parser.py#L75-L115):** Traverses raw data directories, matches CSV files with their companion metadata sidecars, inspects validity status flags, extracts class labels, and generates standardized data manifests for downstream processing.
+- **[`raw_iq_to_complex`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/csi_decoder.py#L56-L64):** Vectorized conversion of interleaved raw 8-bit integer buffers into NumPy 1D complex arrays ($I + jQ$).
+- **[`discover_sessions`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/metadata_parser.py#L75-L114):** Traverses raw data directories, matches CSV files with their companion metadata sidecars, inspects validity status flags, extracts class labels, and generates standardized data manifests for downstream processing.
 
 ---
 
@@ -477,7 +477,7 @@ The acquisition stage was conducted across four distinct experimental campaigns:
 1. **First Test Campaign (April 2026):** Initial feasibility trial using 802.11n HT20 mode on Channel 6 ($20\text{ MHz}$ bandwidth). Validated the serial capture architecture, baud rate stability, and basic complex I/Q decoding over two 60-second sessions (`PLA` and `PLB`).
 2. **Pilot Campaign (May 2026):** Transitioned to 802.11n HT40 mode on Channel 11 ($40\text{ MHz}$ bandwidth). Six sessions (`A` through `F`) were logged. Established the four-phase timing protocol and demonstrated that direct center-mark obstruction was readily detectable. Revealed that sessions A and B suffered from manual timing entry issues, motivating full automation in v2.
 3. **Main Benchmark Campaign (September 2026):** The primary benchmark dataset comprising seven sessions (`G` through `M`). Implemented full multi-position spatial coverage (`p1` to `p4`), collected $111,578\text{ raw CSI frames}$, and achieved a 100% session validation rate.
-4. **Generalization Campaign (September 2026):** Evaluated physical link scaling and spatial transferability across nine sessions (`GA` through `GI`) at an extended $3.00\text{ m}$ distance in an outdoor patio environment.
+4. **Generalization Campaign (September 2026):** Evaluated physical link scaling and spatial transferability across nine sessions (`GA` through `GI`) across four distinct inter-node distances ($2.0\text{ m}, 3.0\text{ m}, 4.0\text{ m}$, and $5.0\text{ m}$) in an outdoor covered patio environment.
 
 ### 9.2 Complete Inventory of Captured Acquisition Sessions
 
@@ -485,8 +485,8 @@ The table below compiles all 24 acquisition sessions recorded in the repository:
 
 | Campaign | Session ID | Condition Label | PHY Mode | BW (MHz) | RF Ch. | Planned Dur. (s) | Total Samples | Status | Mean RSSI (dBm) | Invalidation Reason / Notes |
 | :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| `first_test` | **PLA** | `empty` | HT20 | 20 | 6 | 60 | 1,735 | **VALID** | N/A | Initial HT20 empty baseline trial |
-| `first_test` | **PLB** | `occupied_still` | HT20 | 20 | 6 | 60 | 1,736 | **VALID** | N/A | Initial HT20 occupied trial |
+| `first_test` | **PLA** | `empty` | HT20 | 20 | 6 | 60 | 1,735 | **VALID** | -30.00 | Initial HT20 empty baseline trial |
+| `first_test` | **PLB** | `occupied_still` | HT20 | 20 | 6 | 60 | 1,736 | **VALID** | -42.85 | Initial HT20 occupied trial |
 | `pilot` | **A** | `empty` | HT40 | 40 | 11 | 690 | 19,755 | **INVALID** | -33.19 | Timing mismatch: $t_1, t_2$ did not align with $t_0$ |
 | `pilot` | **B** | `empty` | HT40 | 40 | 11 | 690 | 19,715 | **INVALID** | -33.47 | Timing mismatch: $t_1$ did not align with $t_0$ |
 | `pilot` | **C** | `empty` | HT40 | 40 | 11 | 690 | 19,589 | **VALID** | -33.49 | Validated pilot empty baseline |
@@ -501,14 +501,14 @@ The table below compiles all 24 acquisition sessions recorded in the repository:
 | `main` | **L** | `empty` | HT40 | 40 | 11 | 690 | 20,236 | **VALID** | -27.13 | Main baseline 2 (recorded 00:09) |
 | `main` | **M** | `occupied_p4_still`| HT40 | 40 | 11 | 690 | 20,171 | **VALID** | -29.31 | Main P4: Off-LoS East ($30\text{ cm}$) |
 | `generalization` | **GA** | `empty` | HT40 | 40 | 11 | 150 | 4,170 | **VALID** | -38.34 | Outdoor 3.0 m LoS empty baseline |
-| `generalization` | **GB** | `occupied_still` | HT40 | 40 | 11 | 150 | 4,053 | **VALID** | -48.16 | Outdoor 3.0 m LoS occupied |
-| `generalization` | **GC** | `empty` | HT40 | 40 | 11 | 150 | 4,393 | **VALID** | -42.55 | Outdoor 3.0 m LoS empty repeat |
-| `generalization` | **GD** | `occupied_still` | HT40 | 40 | 11 | 150 | 4,104 | **VALID** | -53.46 | Outdoor 3.0 m LoS occupied repeat |
-| `generalization` | **GE** | `empty` | HT40 | 40 | 11 | 150 | 4,353 | **VALID** | -39.00 | Outdoor 3.0 m LoS empty trial 3 |
-| `generalization` | **GF** | `occupied_still` | HT40 | 40 | 11 | 150 | 4,384 | **VALID** | -43.80 | Outdoor 3.0 m LoS occupied trial 3 |
-| `generalization` | **GG** | `empty` | HT40 | 40 | 11 | 150 | 4,370 | **INVALID** | -31.89 | Intrusion: person entered monitored zone |
-| `generalization` | **GH** | `empty` | HT40 | 40 | 11 | 150 | 4,365 | **VALID** | -31.90 | Outdoor 3.0 m LoS clean empty repeat |
-| `generalization` | **GI** | `occupied_still` | HT40 | 40 | 11 | 150 | 4,012 | **VALID** | -37.23 | Outdoor 3.0 m LoS occupied trial 4 |
+| `generalization` | **GB** | `occupied_still` | HT40 | 40 | 11 | 150 | 4,053 | **VALID** | -48.16 | Outdoor 3.0 m LoS occupied (still) |
+| `generalization` | **GC** | `empty` | HT40 | 40 | 11 | 150 | 4,393 | **VALID** | -42.55 | Outdoor 4.0 m LoS empty baseline |
+| `generalization` | **GD** | `occupied_still` | HT40 | 40 | 11 | 150 | 4,104 | **VALID** | -53.46 | Outdoor 4.0 m LoS occupied (still) |
+| `generalization` | **GE** | `empty` | HT40 | 40 | 11 | 150 | 4,353 | **VALID** | -39.00 | Outdoor 5.0 m LoS empty baseline |
+| `generalization` | **GF** | `occupied_still` | HT40 | 40 | 11 | 150 | 4,384 | **VALID** | -43.80 | Outdoor 5.0 m LoS occupied (still) |
+| `generalization` | **GG** | `empty` | HT40 | 40 | 11 | 150 | 4,370 | **INVALID** | -31.89 | Outdoor 2.0 m LoS: intrusion (person entered area) |
+| `generalization` | **GH** | `empty` | HT40 | 40 | 11 | 150 | 4,365 | **VALID** | -31.90 | Outdoor 2.0 m LoS clean empty repeat |
+| `generalization` | **GI** | `occupied_still` | HT40 | 40 | 11 | 150 | 4,012 | **VALID** | -37.23 | Outdoor 2.0 m LoS occupied (still) |
 
 ### 9.3 Statistical Link Quality in the Main Benchmark Campaign
 

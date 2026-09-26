@@ -73,7 +73,7 @@ The pipeline was developed iteratively to validate algorithms on pilot data befo
 
 ### 3.1 Automated Session Discovery
 
-The ingestion process in [`discover_sessions`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/metadata_parser.py#L75-L115) scans configured directory paths for `.csv` raw captures and matches each file with its companion `_meta.json` sidecar:
+The ingestion process in [`discover_sessions`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/metadata_parser.py#L75-L114) scans configured directory paths for `.csv` raw captures and matches each file with its companion `_meta.json` sidecar:
 
 ```python
 meta_path = csv_path.with_name(f"{csv_path.stem}_meta.json")
@@ -110,12 +110,12 @@ In [`pipeline_v1.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/not
 
 ### 4.1 Baseband Array Conversion & Validation
 
-For each valid session, raw CSV rows are ingested through [`load_session_arrays`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/signal/amplitudes.py#L56-L214):
+For each valid session, raw CSV rows are ingested through [`load_session_arrays`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/signal/amplitudes.py#L56-L213):
 1. **Row-Type Filtering:** Retains rows where `type == "CSI_DATA"`.
 2. **Timestamp Verification:** Validates `timestamp_host` against format `%Y%m%dT%H%M%S.%f`. Rows failing timestamp parsing are dropped.
 3. **CSI Array Decoding:** Decodes the `data` column JSON string into an array of 384 signed 8-bit integers.
 4. **Length Consistency Check:** Enforces that every decoded array matches the expected mode length (`len == 384`). Any corrupted or truncated UART lines are discarded.
-5. **Complex Reconstruction & Amplitude Matrix:** Transforms the raw array $\mathbf{D} \in \mathbb{R}^{N \times 384}$ into a complex matrix $\mathbf{H} \in \mathbb{C}^{N \times 192}$ via [`raw_iq_to_complex`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/csi_decoder.py#L56-L65). The Euclidean amplitude matrix $\mathbf{A} \in \mathbb{R}^{N \times 192}$ is computed via:
+5. **Complex Reconstruction & Amplitude Matrix:** Transforms the raw array $\mathbf{D} \in \mathbb{R}^{N \times 384}$ into a complex matrix $\mathbf{H} \in \mathbb{C}^{N \times 192}$ via [`raw_iq_to_complex`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/csi_decoder.py#L56-L64). The Euclidean amplitude matrix $\mathbf{A} \in \mathbb{R}^{N \times 192}$ is computed via:
    $$\mathbf{A}[t, k] = |H_t(k)| = \sqrt{(\text{Real}(H_t(k)))^2 + (\text{Imag}(H_t(k)))^2}$$
 
 ### 4.2 Shared HT40 Valid-Subcarrier Mask
@@ -129,7 +129,7 @@ The pipeline implements an automated two-tier subcarrier filtering process:
    $$\mathcal{M}_s(k) = \left( \frac{1}{N_s}\sum_{t=1}^{N_s} \mathbf{A}_s[t, k] > 0.5 \right) \land \left( \frac{1}{N_s}\sum_{t=1}^{N_s} \mathbf{A}_s[t, k] < \infty \right)$$
 
 2. **Shared Subcarrier Intersection:**
-   To guarantee a consistent feature space across all sessions, [`compute_shared_valid_mask`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/signal/subcarrier_filter.py#L18-L39) computes the boolean intersection across all $S = 11$ validated sessions:
+   To guarantee a consistent feature space across all sessions, [`compute_shared_valid_mask`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/signal/subcarrier_filter.py#L18-L38) computes the boolean intersection across all $S = 11$ validated sessions:
    $$\mathcal{M}_{\text{shared}}(k) = \bigwedge_{s=1}^S \mathcal{M}_s(k), \quad \forall k \in \{0, 1, \dots, 191\}$$
 
 ```mermaid
@@ -175,7 +175,7 @@ $$\mathcal{T}_{\text{active}} = \{t \in \mathcal{T}_{\text{recording}} \mid t_1 
 
 ### 5.2 Non-Overlapping Window Segmentation
 
-Continuous time series are segmented into discrete temporal observation windows using [`segment_non_overlapping_windows`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/signal/segmentation.py#L64-L137):
+Continuous time series are segmented into discrete temporal observation windows using [`segment_non_overlapping_windows`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/signal/segmentation.py#L64-L136):
 
 - **Window Duration:** Fixed window length $T_w = 2.0\text{ seconds}$ (`window_seconds = 2.0`).
 - **Stride:** Non-overlapping stride ($\text{step} = T_w = 2.0\text{ s}$). Non-overlapping windows guarantee that each raw CSI packet contributes to exactly one feature observation.
@@ -190,17 +190,17 @@ Across all 11 ingested sessions, the segmentation module yielded clean window co
 
 | Session ID | Label Name | Condition Window ($s$) | Candidate Windows | Retained Windows | Dropped Windows | Mean Samples / Window |
 | :---: | :--- | :---: | :---: | :---: | :---: | :---: |
-| **C** | `empty` | 600.0 | 300 | **300** | 0 | 56.78 |
-| **D** | `occupied_still` | 600.0 | 300 | **300** | 0 | 52.31 |
-| **E** | `occupied_moving` | 600.0 | 300 | **300** | 0 | 53.94 |
-| **F** | `empty` | 600.0 | 300 | **300** | 0 | 58.66 |
-| **G** | `empty` | 600.0 | 300 | **300** | 0 | 58.41 |
-| **H** | `occupied_p1_still` | 600.0 | 300 | **300** | 0 | 57.92 |
-| **I** | `occupied_p2_still` | 600.0 | 300 | **300** | 0 | 57.72 |
-| **J** | `empty` (extended) | 1,800.0 | 900 | **900** | 0 | 58.28 |
-| **K** | `occupied_p3_still` | 600.0 | 300 | **300** | 0 | 58.12 |
-| **L** | `empty` | 600.0 | 300 | **300** | 0 | 58.66 |
-| **M** | `occupied_p4_still` | 600.0 | 300 | **300** | 0 | 58.46 |
+| **C** | `empty` | 600.0 | 300 | **300** | 0 | 56.92 |
+| **D** | `occupied_still` | 600.0 | 300 | **300** | 0 | 52.35 |
+| **E** | `occupied_moving` | 600.0 | 300 | **300** | 0 | 54.06 |
+| **F** | `empty` | 600.0 | 300 | **300** | 0 | 58.67 |
+| **G** | `empty` | 600.0 | 300 | **300** | 0 | 58.42 |
+| **H** | `occupied_p1_still` | 600.0 | 300 | **300** | 0 | 57.86 |
+| **I** | `occupied_p2_still` | 600.0 | 300 | **300** | 0 | 57.71 |
+| **J** | `empty` (extended) | 1,800.0 | 900 | **900** | 0 | 58.27 |
+| **K** | `occupied_p3_still` | 600.0 | 300 | **300** | 0 | 58.07 |
+| **L** | `empty` | 600.0 | 300 | **300** | 0 | 58.65 |
+| **M** | `occupied_p4_still` | 600.0 | 300 | **300** | 0 | 58.51 |
 | **Total** | — | **7,800.0 s** | **3,900** | **3,900** | **0** | **57.39** |
 
 - Across all 3,900 windows, sample counts ranged between $36$ and $60$ packets per window ($\mu = 57.39$, $\sigma = 2.81$), with every window exceeding the 29-sample threshold.
@@ -246,7 +246,7 @@ In the production configuration ([`configs/pipeline.yaml`](file:///home/xavier/d
 
 ### 7.1 Multi-Descriptor Formulation
 
-For each 2.0-second window containing $N$ amplitude observations across 162 retained subcarriers $\mathbf{X} \in \mathbb{R}^{N \times 162}$, [`extract_official_features`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/features/statistical.py#L24-L50) computes four complementary statistical descriptors for each subcarrier column $\mathbf{x} = [x_1, x_2, \dots, x_N]^T$:
+For each 2.0-second window containing $N$ amplitude observations across 162 retained subcarriers $\mathbf{X} \in \mathbb{R}^{N \times 162}$, [`extract_official_features`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/features/statistical.py#L24-L49) computes four complementary statistical descriptors for each subcarrier column $\mathbf{x} = [x_1, x_2, \dots, x_N]^T$:
 
 1. **Sample Variance (`var`):**
    Measures overall dispersion around the window mean, with Bessel's correction for unbiased estimation:

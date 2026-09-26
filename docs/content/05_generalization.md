@@ -4,7 +4,7 @@
 
 ## 1. Executive Summary & Generalization Campaign Objectives
 
-The final experimental stage of this undergraduate thesis evaluates the **out-of-distribution (OOD) generalization capacity** of the machine learning pipelines developed in [Stage 4](file:///home/xavier/dev/wifi-csi-presence-detection/docs/content/04_modeling.md). In Stage 4, all four evaluated supervised model families (Gradient Boosted Decision Trees, Random Forest, Multilayer Perceptron, and Support Vector Machines) demonstrated in-distribution performance on held-out test data from the primary indoor bedroom environment ($3.80\text{ m} \times 3.50\text{ m} \times 2.80\text{ m}$ at a fixed $2.00\text{ m}$ inter-node Line-of-Sight distance), reaching test macro $F_1$-scores exceeding $0.989$ and false alarm rates $\le 0.32\%$.
+The final experimental stage of this undergraduate thesis evaluates the **out-of-distribution (OOD) generalization capacity** of the machine learning pipelines developed in [Stage 4](file:///home/xavier/dev/wifi-csi-presence-detection/docs/content/04_modeling.md). In Stage 4, all four evaluated supervised model families (Gradient Boosted Decision Trees, Random Forest, Multilayer Perceptron, and Support Vector Machines) demonstrated in-distribution performance on held-out test data from the primary indoor bedroom environment ($3.40\text{ m} \times 3.45\text{ m} \times 2.85\text{ m}$ at a fixed $2.00\text{ m}$ inter-node Line-of-Sight distance), reaching test macro $F_1$-scores exceeding $0.989$ and false alarm rates $\le 0.32\%$.
 
 However, a fundamental unresolved challenge in device-free Wi-Fi Channel State Information (CSI) sensing is **environmental overfitting**. Because Wi-Fi CSI captures fine-grained, carrier-frequency-dependent multipath superposition, statistical dispersion descriptors computed across all subcarriers risk encoding the stationary boundary reflections of a specific room (wall materials, furniture geometry, cavity resonance modes) rather than invariant, human-induced signal modulation.
 
@@ -14,7 +14,7 @@ To determine whether the models learn **true physical presence signatures** or *
 
 ### Validation Principles
 - **Strict Zero-Retraining Policy:** All models are evaluated strictly as frozen inference artifacts loaded from [`models/registry/`](file:///home/xavier/dev/wifi-csi-presence-detection/models/registry/). No retraining, fine-tuning, domain adaptation, or recalibration is performed.
-- **Full vs. Lightweight Architecture Comparison:** The 4 full-feature models (648 features across 162 active subcarriers) are benchmarked directly against their 4 corresponding lightweight counterparts (20 features across the top 5 physical subcarriers selected via the 1-SE rule in [Stage 4](file:///home/xavier/dev/wifi-csi-presence-detection/docs/content/04_modeling.md#6-feature-minimization--lightweight-model-family-06_feature_minimizationipynb)).
+- **Full vs. Lightweight Architecture Comparison:** The 4 full-feature models (648 features across 162 active subcarriers) are benchmarked directly against their 4 corresponding lightweight counterparts (20 features across the top 5 physical subcarriers selected via the 1-SE rule in [Stage 4](file:///home/xavier/dev/wifi-csi-presence-detection/docs/content/04_modeling.md#7-feature--subcarrier-minimization-experiment-06_feature_minimizationipynb)).
 - **Subcarrier Alignment Rigor:** Feature extraction adheres strictly to the reference 162-subcarrier active mask ([`data/03_processed/valid_subcarrier_mapping.csv`](file:///home/xavier/dev/wifi-csi-presence-detection/data/03_processed/valid_subcarrier_mapping.csv)).
 - **Automated Data Hygiene:** Automated session discovery rejects invalid sessions (such as protocol intrusion events) prior to feature generation.
 
@@ -85,9 +85,9 @@ The out-of-distribution recording campaign was conducted in an environment with 
 | :--- | :--- | :--- | :--- |
 | **Environment Identifier** | `bedroom_closed_door` / `bedroom_open_door` | `outdoor_area_*m_los` | Cross-domain environmental transfer |
 | **Setting Type** | Enclosed residential bedroom | Semi-open outdoor covered patio | Dramatic reduction in wall multipath reflections |
-| **Room Dimensions ($L \times W \times H$)** | $3.80\text{ m} \times 3.50\text{ m} \times 2.80\text{ m}$ ($37.2\text{ m}^3$) | $4.80\text{ m} \times 3.90\text{ m} \times 2.80\text{ m}$ ($52.4\text{ m}^3$) | Expanded spatial volume ($+40.9\%$) |
+| **Room Dimensions ($L \times W \times H$)** | $3.40\text{ m} \times 3.45\text{ m} \times 2.85\text{ m}$ ($33.43\text{ m}^3$) | $4.80\text{ m} \times 3.90\text{ m} \times 2.80\text{ m}$ ($52.42\text{ m}^3$) | Expanded spatial volume ($+56.8\%$) |
 | **Floor Boundary** | Engineered wood laminate on concrete | Vitrified ceramic tiles | Altered specular ground reflection coefficient |
-| **Wall Boundaries** | 4 solid masonry walls with wood door & aluminum window | Semi-open perimeter with open air, brick wall, and glass/wood obstacles | High delay-spread reverberation replaced by open boundary dissipation |
+| **Wall Boundaries** | 4 solid masonry walls with wood door & iron/glass window | Semi-open perimeter with open air, brick wall, and glass/wood obstacles | High delay-spread reverberation replaced by open boundary dissipation |
 | **Inter-Node Distances ($d$)** | $2.00\text{ m}$ (fixed LoS) | **$2.00\text{ m}$, $3.00\text{ m}$, $4.00\text{ m}$, $5.00\text{ m}$** | Test of geometrical distance scaling |
 | **Node Height** | $1.20\text{ m}$ (tripod mounted) | $1.20\text{ m}$ (tripod mounted) | Standardized human torso plane ($h = 1.20\text{ m}$) |
 | **Subject Orientation** | Facing North (towards RX node) | Facing West (towards TX node) | Test of body shadowing orientation invariance |
@@ -142,7 +142,7 @@ Instead of silently retaining or silently discarding the data, the operator upda
 ```
 The session was immediately re-executed under clean conditions as Session `GH` (`status: "VALID"`). 
 
-When [`discover_sessions()`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/metadata_parser.py) was invoked with `required_status="VALID"` in [`02_model_evaluation.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/05_generalization/02_model_evaluation.ipynb#452-463), the parser detected the anomaly, issued a formal warning (`UserWarning: Skipping session GG due to invalid metadata status: INVALID`), and omitted Session `GG` from the dataset.
+When [`discover_sessions()`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/parsing/metadata_parser.py) was invoked with `required_status="VALID"` in [`02_model_evaluation.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/05_generalization/02_model_evaluation.ipynb), the parser detected the anomaly, issued a formal warning (`UserWarning: Skipping session GG due to invalid metadata status: INVALID`), and omitted Session `GG` from the dataset.
 
 ### 2.5 Generalization Campaign Session Inventory
 
@@ -170,9 +170,9 @@ The generalization campaign recorded 9 raw sessions in [`data/01_raw/generalizat
 
 A critical technical requirement for cross-dataset inference is guaranteeing that input features match the exact physical subcarrier frequencies on which the models were trained. 
 
-As established in [Stage 2](file:///home/xavier/dev/wifi-csi-presence-detection/docs/content/02_pipeline.md#4-subcarrier-selection--dead-carrier-masking), out of the 192 raw subcarriers reported by the ESP32-S3 under 802.11n HT40, 30 dead subcarriers (null DC carriers, guard bands, and out-of-band indices) were discarded. The remaining 162 active subcarriers were serialized to [`data/03_processed/valid_subcarrier_mapping.csv`](file:///home/xavier/dev/wifi-csi-presence-detection/data/03_processed/valid_subcarrier_mapping.csv).
+As established in [Stage 2](file:///home/xavier/dev/wifi-csi-presence-detection/docs/content/02_pipeline.md#4-signal-decoding--subcarrier-masking), out of the 192 raw subcarriers reported by the ESP32-S3 under 802.11n HT40, 30 dead subcarriers (null DC carriers, guard bands, and out-of-band indices) were discarded. The remaining 162 active subcarriers were serialized to [`data/03_processed/valid_subcarrier_mapping.csv`](file:///home/xavier/dev/wifi-csi-presence-detection/data/03_processed/valid_subcarrier_mapping.csv).
 
-In [`02_model_evaluation.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/05_generalization/02_model_evaluation.ipynb#518-534), this mapping is loaded to construct a boolean `reference_mask` of length 192:
+In [`02_model_evaluation.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/05_generalization/02_model_evaluation.ipynb), this mapping is loaded to construct a boolean `reference_mask` of length 192:
 ```python
 mapping_df = pd.read_csv("data/03_processed/valid_subcarrier_mapping.csv")
 raw_indices = mapping_df["raw_subcarrier_index"].values
@@ -200,9 +200,9 @@ The active condition interval ($60\text{ s}$) of each valid session was partitio
 
 All 8 pre-trained model bundles were retrieved from [`models/registry/`](file:///home/xavier/dev/wifi-csi-presence-detection/models/registry/):
 1. **Full Feature Family (648 Features):** Models trained on all 162 subcarriers across all 4 dispersion descriptors (Variance, MAD, Range, IQR), with feature scaling handled by the bundled `StandardScaler`.
-2. **Lightweight Family (20 Features / 5 Subcarriers):** Models trained strictly on the 5 physical subcarriers (`sc041`, `sc040`, `sc042`, `sc047`, `sc012`) selected in [Stage 4](file:///home/xavier/dev/wifi-csi-presence-detection/docs/content/04_modeling.md#6-feature-minimization--lightweight-model-family-06_feature_minimizationipynb), requiring only 20 input features.
+2. **Lightweight Family (20 Features / 5 Subcarriers):** Models trained strictly on the 5 physical subcarriers (`sc041`, `sc040`, `sc042`, `sc047`, `sc012`) selected in [Stage 4](file:///home/xavier/dev/wifi-csi-presence-detection/docs/content/04_modeling.md#7-feature--subcarrier-minimization-experiment-06_feature_minimizationipynb), requiring only 20 input features.
 
-Inference was executed on the 232 OOD samples. Baseline in-distribution test metrics from the held-out bedroom partition ([`test.parquet`](file:///home/xavier/dev/wifi-csi-presence-detection/data/03_processed/test.parquet)) were loaded directly from each bundle's `model_card.json` to compute the generalization degradation $\Delta F_1 = F_{1,\text{OOD}} - F_{1,\text{Baseline}}$.
+Inference was executed on the 232 OOD samples. Baseline in-distribution test metrics from the held-out bedroom partition ([`test.parquet`](file:///home/xavier/dev/wifi-csi-presence-detection/data/03_processed/splits/test.parquet)) were loaded directly from each bundle's `model_card.json` to compute the generalization degradation $\Delta F_1 = F_{1,\text{OOD}} - F_{1,\text{Baseline}}$.
 
 ### 4.2 Comprehensive Global Performance Benchmark
 
@@ -351,7 +351,7 @@ Outdoor Covered Patio (OOD Generalization):
 
 ### 6.2 Why the 5 Optimal Subcarriers Generalize Universally
 
-In [Stage 4](file:///home/xavier/dev/wifi-csi-presence-detection/docs/content/04_modeling.md#6-feature-minimization--lightweight-model-family-06_feature_minimizationipynb), the 1-Standard-Error rule identified an optimal subset of 5 physical subcarrier indices:
+In [Stage 4](file:///home/xavier/dev/wifi-csi-presence-detection/docs/content/04_modeling.md#7-feature--subcarrier-minimization-experiment-06_feature_minimizationipynb), the 1-Standard-Error rule identified an optimal subset of 5 physical subcarrier indices:
 $$\mathcal{S}^* = \{\text{sc041},\; \text{sc040},\; \text{sc042},\; \text{sc047},\; \text{sc012}\}$$
 
 These subcarriers exhibit three unique physical properties:
