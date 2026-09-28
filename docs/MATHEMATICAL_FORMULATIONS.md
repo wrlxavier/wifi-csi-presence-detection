@@ -64,15 +64,25 @@ Quantified as the sample standard deviation of inter-packet arrival intervals:
 $$\sigma_{\Delta t} = \sqrt{\frac{1}{N - 2}\sum_{i=2}^N (\Delta t_i - \overline{\Delta t})^2}, \quad \text{where } \overline{\Delta t} = \frac{1}{N-1}\sum_{i=2}^N \Delta t_i$$
 
 ### 2.3 Network Gap Detection & Packet Loss Estimation
-* **Notebooks:** [`eda_pilot.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_pilot.ipynb), [`eda_main.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_main.ipynb)
+* **Notebooks:** [`eda_pilot.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_pilot.ipynb), [`eda_main.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_main.ipynb), [`eda_first_test.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_first_test.ipynb)
 
 * **Packet Gap Threshold:** With nominal period $T_{\text{nom}} = \frac{1}{30\text{ Hz}} \approx 33.33\text{ ms}$:
   $$\Delta t_{\text{gap}} = 2.5 \times T_{\text{nom}} = 83.33\text{ ms}$$
   Any interval $\Delta t_i > \Delta t_{\text{gap}}$ is flagged as an arrival stall event.
 
-* **Estimated Packet Loss Percentage:**
+* **Nominal Expected Packet Count:**
   $$N_{\text{expected}} = \left\lfloor \frac{t_N - t_1}{T_{\text{nom}}} \right\rceil$$
-  $$\text{Loss } (\%) = \max\left(0, \frac{N_{\text{expected}} - N}{N_{\text{expected}}}\right) \times 100\%$$
+
+* **Rejected Alternative (Naive Difference Estimator):**
+  $$\text{Loss}_{\text{naive}} (\%) = \max\left(0, \frac{N_{\text{expected}} - N}{N_{\text{expected}}}\right) \times 100\%$$
+  > [!NOTE]
+  > **Rejection Rationale:** The naive estimator computes a global count deficit against nominal clock. However, physical crystal oscillators on the ESP32-S3 transmitter exhibit natural frequency tolerances and host OS receive jitter (e.g., transmitting at ~29.8 Hz instead of exactly 30.0 Hz). Over a 10-minute session ($N \approx 18{,}000$ packets), this clock drift accumulates an artificial deficit of ~120 packets ($\approx 0.67\%$ apparent loss), despite zero dropped packets.
+
+* **Implemented Gap-Accumulation Formulation:**
+  To guarantee robustness against oscillator drift, packet loss is estimated strictly across flagged arrival gap intervals ($\Delta t_i > \Delta t_{\text{gap}}$):
+  $$N_{\text{lost, est}} = \max\left(0, \, \left\lfloor \sum_{i \in \text{gaps}} \frac{\Delta t_i}{T_{\text{nom}}} \right\rceil - |\text{gaps}|\right)$$
+  $$\text{Loss } (\%) = \frac{N_{\text{lost, est}}}{N_{\text{expected}}} \times 100\%$$
+  This formulation isolates physical transmission dropout events from benign crystal frequency drift.
 
 ### 2.4 Mean Received Signal Strength Indicator (RSSI)
 * **Notebooks:** [`csi_collector_v2.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/00_acquisition/csi_collector_v2.ipynb), [`eda_main.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/01_eda/eda_main.ipynb)
@@ -116,6 +126,10 @@ For each valid subcarrier $k \in \{0, 1, \dots, 161\}$ and window $W$ containing
 * **Tabular Dimensionality:**
   $$D = N_{\text{sub}} \times 4 = 162 \times 4 = 648 \text{ features per window}$$
 
+> [!NOTE]
+> **Implementation Nuance on MAD (Official Pipeline vs. Exploratory Figures):**
+> In the official machine learning feature extraction pipeline ([`statistical.py`](file:///home/xavier/dev/wifi-csi-presence-detection/src/wifi_csi/features/statistical.py#L8-L11)), `mad` is strictly the **Mean Absolute Deviation around the sample mean** ($\frac{1}{M}\sum |A_m - \overline{A}|$). In the preliminary exploratory visualization notebook ([`separability_figures.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/03_analysis/separability_figures.ipynb#L13)), the **median absolute deviation around the median** ($\operatorname{median}(|A_m - \operatorname{median}(A)|)$) was used solely for qualitative graphic plots to minimize visual outliers. The machine learning pipeline, tabular datasets, and models exclusively use the sample mean formulation presented above.
+
 ### 3.3 Zero-Leakage Standardization
 * **Notebooks:** [`02_preprocessing.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/04_modeling/02_preprocessing.ipynb)
 
@@ -147,6 +161,10 @@ $$\tilde{X}_{i, j} = \frac{X_{i, j} - \mu_j}{\sigma_j}$$
 Measures the standardized difference between two group means ($\overline{x}_1, \overline{x}_2$):
 
 $$d = \frac{\overline{x}_1 - \overline{x}_2}{s_{\text{pooled}}}, \quad \text{where } s_{\text{pooled}} = \sqrt{\frac{(n_1 - 1)s_1^2 + (n_2 - 1)s_2^2}{n_1 + n_2 - 2}}$$
+
+> [!NOTE]
+> **Implementation Nuance on Pooled Variance:**
+> The equation above specifies the canonical unbiased pooled standard deviation with degrees-of-freedom weighting ($(n_1 - 1)s_1^2 + (n_2 - 1)s_2^2$). In [`separability_lda.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/03_analysis/separability_lda.ipynb#L8), NumPy's `x.var()` default (`ddof=0`) is called on group arrays before scaling by $(n_i - 1)$. Because group sample sizes are large ($n_i \ge 400$ windows), the finite-sample difference between $\frac{n_i - 1}{n_i} \approx 0.998$ produces a negligible numerical effect ($< 0.2\%$), with the equation above representing the exact, standard analytical definition.
 
 ### 4.3 Principal Component Analysis (PCA)
 * **Notebooks:** [`separability_lda.ipynb`](file:///home/xavier/dev/wifi-csi-presence-detection/notebooks/03_analysis/separability_lda.ipynb)
