@@ -20,12 +20,12 @@ help:
 	@echo "  make live-mlp-light- Launch real-time presence detection with lightweight MLP (3 us, 5 SCs)"
 	@echo "  make live-rf-light - Launch real-time presence detection with lightweight Random Forest (5 SCs)"
 	@echo "  make live-gb-light - Launch real-time presence detection with lightweight Gradient Boosting (5 SCs)"
-	@echo "  make compress      - Compress untracked/ignored data into outputs/backups/ (opt: ARCHIVE=name.zip)"
-	@echo "  make zenodo        - Compress academic dataset for Zenodo (opt: ARCHIVE=name.zip)"
-	@echo "  make compress-zenodo- Alias for zenodo"
+	@echo "  make compress      - Package Zenodo academic dataset archive into outputs/backups/ (opt: ARCHIVE=name.zip)"
+	@echo "  make zenodo        - Alias for compress"
+	@echo "  make compress-zenodo- Alias for compress"
 	@echo "  make download-zenodo- Download official dataset archive from Zenodo (record 23960575)"
-	@echo "  make restore       - Restore data from compressed archive in outputs/backups/ (opt: ARCHIVE=name.zip)"
-	@echo "  make restore-zenodo- Restore Zenodo dataset and validate academic scope (opt: ARCHIVE=name.zip)"
+	@echo "  make restore       - Restore and validate Zenodo dataset archive (opt: ARCHIVE=name.zip)"
+	@echo "  make restore-zenodo- Alias for restore"
 	@echo "  make fetch-zenodo  - Download and restore Zenodo dataset in one step"
 	@echo "  make clean         - Clean cache and transient build files"
 
@@ -60,20 +60,18 @@ compress:
 
 backup: compress
 
-compress-zenodo:
-	$(UV) run python scripts/backup_data.py compress --zenodo $(ARCHIVE_ARG)
+compress-zenodo: compress
 
-zenodo: compress-zenodo
+zenodo: compress
 
 restore:
 	$(UV) run python scripts/backup_data.py restore $(ARCHIVE_ARG)
 
 decompress: restore
 
-restore-zenodo:
-	$(UV) run python scripts/backup_data.py restore --zenodo $(ARCHIVE_ARG)
+restore-zenodo: restore
 
-decompress-zenodo: restore-zenodo
+decompress-zenodo: restore
 
 download-zenodo:
 	@mkdir -p outputs/backups
@@ -81,7 +79,7 @@ download-zenodo:
 	curl -L -o outputs/backups/$(ZENODO_FILE) "$(ZENODO_URL)"
 	@echo "Download complete: outputs/backups/$(ZENODO_FILE)"
 
-fetch-zenodo: download-zenodo restore-zenodo
+fetch-zenodo: download-zenodo restore
 
 
 clean:

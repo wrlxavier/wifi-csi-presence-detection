@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""Manage compressed backup archives of untracked and .gitignore-excluded project data.
+"""Manage Zenodo-standard dataset backup and recovery for open science.
 
-This script provides two primary functions:
-1. compress: Archives all untracked and .gitignore-excluded data, models, reports,
-   and generated images into a timestamped (or named) .zip file inside the outputs/backups folder.
-2. decompress (restore): Extracts a specific (or latest) .zip archive from the outputs/backups folder,
-   restores each file to its original project location, and validates that the file structure
-   matches project expectations.
+This script provides two primary functions adhering strictly to the Zenodo v2.0.0 dataset standard:
+1. compress: Packages untracked and .gitignore-excluded data (data/01_raw, data/03_processed),
+   trained models and pipeline registry bundles (models/), and feature minimization metadata
+   (reports/logs/optimal_features.json) into a Zenodo-standard .zip archive in outputs/backups/.
+   Bulky transient outputs, diagnostic plots, and figure images are excluded by design.
+2. decompress (restore): Extracts a Zenodo dataset archive from outputs/backups/, restores
+   each file to its original repository location, and validates that all essential data,
+   model checkpoints, and pipeline configurations are intact.
 """
 
 from __future__ import annotations
@@ -41,14 +43,16 @@ def _find_repo_root(start_path: Path | None = None) -> Path:
 def _get_untracked_files(
     repo_root: Path,
     target_archive_path: Path | None = None,
-    zenodo: bool = False,
+    zenodo: bool = True,
 ) -> list[Path]:
-    """Discover untracked and .gitignore-excluded files, filtering out transient caches/envs.
+    """Discover untracked files strictly scoped to the Zenodo dataset specification.
 
-    When zenodo=True, scopes the discovery strictly to data/ and models/ directories,
-    and specifically includes reports/logs/optimal_features.json. All other directories
-    (including outputs/) and all other reports/ files are excluded.
+    Includes raw CSI sessions (data/01_raw), processed features and splits (data/03_processed),
+    trained model checkpoints and registry bundles (models/), and feature minimization metadata
+    (reports/logs/optimal_features.json).
+    All graphics/plots, figure directories, outputs/, and transient caches are excluded.
     """
+    del zenodo  # Zenodo standard is the sole supported backup/export scope
     raw_rel_paths: list[str] = []
 
     # 1. Primary discovery via git if available
@@ -56,12 +60,12 @@ def _get_untracked_files(
     used_git = False
     if git_dir.exists():
         try:
-            # Files ignored by .gitignore (data, models, outputs, reports)
+            # Files ignored by .gitignore (data, models)
             cmd_ignored = ["git", "ls-files", "-z", "--others", "--ignored", "--exclude-standard"]
             res_ignored = subprocess.run(cmd_ignored, cwd=repo_root, capture_output=True, check=True)
             raw_rel_paths.extend([f.decode("utf-8", "surrogateescape") for f in res_ignored.stdout.split(b"\0") if f])
 
-            # Untracked files in project directories not yet committed (e.g., new light models/cards)
+            # Untracked files not yet committed
             cmd_untracked = ["git", "ls-files", "-z", "--others", "--exclude-standard"]
             res_untracked = subprocess.run(cmd_untracked, cwd=repo_root, capture_output=True, check=True)
             raw_rel_paths.extend([f.decode("utf-8", "surrogateescape") for f in res_untracked.stdout.split(b"\0") if f])
@@ -72,11 +76,8 @@ def _get_untracked_files(
 
     # 2. Fallback filesystem scan if git is unavailable or failed
     if not used_git:
-        data_roots = ["data", "models"] if zenodo else ["data", "models", "outputs", "reports"]
-        valid_exts = {
-            ".csv", ".json", ".parquet", ".png", ".jpg", ".jpeg", ".svg",
-            ".pdf", ".pkl", ".joblib", ".tex",
-        }
+        data_roots = ["data", "models"]
+        valid_exts = {".csv", ".json", ".parquet", ".pkl", ".joblib"}
         for dr in data_roots:
             dir_path = repo_root / dr
             if dir_path.is_dir():
@@ -86,7 +87,7 @@ def _get_untracked_files(
                         if p.suffix.lower() in valid_exts and p.name != ".gitkeep":
                             raw_rel_paths.append(str(p.relative_to(repo_root)))
 
-    # 3. Always ensure all model bundle cards in models/registry/ are included for a self-contained archive
+    # 3. Always ensure all model bundle cards in models/registry/ are included
     registry_dir = repo_root / "models/registry"
     if registry_dir.is_dir():
         for card in registry_dir.glob("*/model_card.json"):
@@ -97,7 +98,7 @@ def _get_untracked_files(
     if optimal_features_file.is_file():
         raw_rel_paths.append("reports/logs/optimal_features.json")
 
-    # Transient and environment patterns to exclude from backup
+    # Transient and environment patterns to exclude
     exclude_dir_names = {
         "__pycache__", ".venv", "venv", "env", "env.bak", "venv.bak",
         ".pytest_cache", ".ruff_cache", ".mypy_cache", ".hypothesis",
@@ -105,7 +106,6 @@ def _get_untracked_files(
     }
     exclude_file_exts = {".pyc", ".pyo", ".pyd"}
     exclude_filenames = {".DS_Store", "Thumbs.db"}
-    allowed_top_dirs = {"data", "models", "outputs", "reports"}
 
     target_resolved = target_archive_path.resolve() if target_archive_path else None
 
@@ -115,20 +115,17 @@ def _get_untracked_files(
         parts = rel_path.parts
         parts_set = set(parts)
 
-        # In Zenodo mode: strictly data/, models/, and reports/logs/optimal_features.json
-        if zenodo:
-            is_data_or_models = bool(parts and parts[0] in {"data", "models"})
-            is_optimal_features = rel_path.as_posix() == "reports/logs/optimal_features.json"
-            if not (is_data_or_models or is_optimal_features):
-                continue
-            # Strictly exclude graphics/plots and figure directories to keep only datasets and models
-            if rel_path.suffix.lower() in {".png", ".jpg", ".jpeg", ".svg", ".pdf", ".gif", ".webp"}:
-                continue
-            if bool(parts_set & {"figures", "plots"}):
-                continue
-        else:
-            if not parts or parts[0] not in allowed_top_dirs:
-                continue
+        # Zenodo scope: strictly data/, models/, and reports/logs/optimal_features.json
+        is_data_or_models = bool(parts and parts[0] in {"data", "models"})
+        is_optimal_features = rel_path.as_posix() == "reports/logs/optimal_features.json"
+        if not (is_data_or_models or is_optimal_features):
+            continue
+
+        # Strictly exclude graphics/plots and figure directories to keep only datasets and models
+        if rel_path.suffix.lower() in {".png", ".jpg", ".jpeg", ".svg", ".pdf", ".gif", ".webp"}:
+            continue
+        if bool(parts_set & {"figures", "plots"}):
+            continue
 
         # Exclude development/environment caches
         if parts_set & exclude_dir_names:
@@ -151,8 +148,9 @@ def _get_untracked_files(
     return sorted(untracked_files)
 
 
-def _validate_structure(repo_root: Path, zenodo: bool = False) -> tuple[bool, list[str]]:
-    """Validate that the restored project file structure matches expected components."""
+def _validate_structure(repo_root: Path, zenodo: bool = True) -> tuple[bool, list[str]]:
+    """Validate that the restored project file structure matches the Zenodo dataset specification."""
+    del zenodo  # Zenodo specification is the sole validation standard
     checks: list[str] = []
     success = True
 
@@ -203,33 +201,16 @@ def _validate_structure(repo_root: Path, zenodo: bool = False) -> tuple[bool, li
         checks.append("models: Missing trained model checkpoints (*.pkl) or registry bundles")
         success = False
 
-    # 4. Generated analysis and diagnostic output figures
-    outputs_dir = repo_root / "outputs"
-    output_files = [f for f in outputs_dir.glob("*/*") if f.is_file() and f.suffix != ".gitkeep"] if outputs_dir.exists() else []
-    if output_files:
-        checks.append(f"outputs: Found {len(output_files)} generated figures and pipeline artifacts")
-    elif zenodo:
-        checks.append("outputs: Omitted by design (Zenodo academic dataset scope)")
-    else:
-        checks.append("outputs: Missing generated figures and pipeline artifacts")
-        success = False
+    # 4. Generated analysis outputs (omitted by design under Zenodo standard)
+    checks.append("outputs: Omitted by design (Zenodo academic dataset scope)")
 
-    # 5. Thesis reports, evaluation logs, and LaTeX tables
+    # 5. Feature selection metadata in reports/logs
     reports_dir = repo_root / "reports"
-    report_files = [f for f in reports_dir.glob("*/*") if f.is_file()] if reports_dir.exists() else []
     opt_file = reports_dir / "logs/optimal_features.json"
     if opt_file.is_file():
-        if zenodo:
-            checks.append("reports/logs: optimal_features.json verified (Zenodo academic scope)")
-        else:
-            opt_status = " (optimal_features.json verified)"
-            checks.append(f"reports: Found {len(report_files)} thesis figures, LaTeX tables, and evaluation logs{opt_status}")
+        checks.append("reports/logs: optimal_features.json verified (Zenodo academic scope)")
     else:
         checks.append("reports/logs: Missing optimal_features.json feature selection metadata")
-        success = False
-
-    if not zenodo and not report_files:
-        checks.append("reports: Missing thesis publication figures, tables, or evaluation logs")
         success = False
 
     return success, checks
@@ -239,35 +220,33 @@ def compress(
     archive_name: str | Path | None = None,
     output_dir: str | Path = "outputs/backups",
     repo_root: str | Path | None = None,
-    zenodo: bool = False,
+    zenodo: bool = True,
 ) -> Path:
-    """Compress untracked data and model assets into a single zip archive.
+    """Compress untracked project data and models adhering strictly to Zenodo standard.
 
     Parameters
     ----------
     archive_name : str | Path | None
-        Optional filename or full path for the zip archive. If None and zenodo is False,
-        generates a unique timestamped filename (e.g., 'backup_YYYYMMDD_HHMMSS.zip').
-        If None and zenodo is True, defaults to ZENODO_DEFAULT_ARCHIVE_NAME
-        ('wifi-csi-presence-detection-zenodo-2026-v2.0.0.zip').
+        Optional filename or full path for the zip archive. Defaults to
+        ZENODO_DEFAULT_ARCHIVE_NAME ('wifi-csi-presence-detection-zenodo-2026-v2.0.0.zip').
     output_dir : str | Path
         Directory where the archive will be saved (default: 'outputs/backups').
     repo_root : str | Path | None
         Root directory of the project repository.
     zenodo : bool
-        If True, restricts the archive scope to data/, models/, and reports/logs/optimal_features.json.
-        Excludes outputs/ and all other reports/ files.
+        Maintained for interface compatibility (always True; Zenodo is the sole method).
 
     Returns
     -------
     Path
         Absolute path to the created zip archive.
     """
+    del zenodo
     root = _find_repo_root(Path(repo_root) if repo_root else None)
     out_dir = Path(output_dir) if Path(output_dir).is_absolute() else (root / output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Determine archive filename
+    # Determine archive filename (defaults to Zenodo v2.0.0 name)
     if archive_name:
         p_name = Path(archive_name)
         if p_name.is_absolute():
@@ -277,21 +256,17 @@ def compress(
         else:
             fname = p_name.name if p_name.suffix.lower() == ".zip" else f"{p_name.name}.zip"
             archive_path = out_dir / fname
-    elif zenodo:
-        archive_path = out_dir / ZENODO_DEFAULT_ARCHIVE_NAME
     else:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        archive_path = out_dir / f"backup_{timestamp}.zip"
+        archive_path = out_dir / ZENODO_DEFAULT_ARCHIVE_NAME
 
     archive_path.parent.mkdir(parents=True, exist_ok=True)
 
     print("=" * 65)
-    header = "  COMPRESSING ZENODO ACADEMIC DATASET" if zenodo else "  COMPRESSING UNTRACKED PROJECT DATA"
-    print(header)
+    print("  COMPRESSING ZENODO ACADEMIC DATASET")
     print(f"  Destination: {archive_path.relative_to(root) if archive_path.is_relative_to(root) else archive_path}")
     print("=" * 65)
 
-    files_to_pack = _get_untracked_files(root, target_archive_path=archive_path, zenodo=zenodo)
+    files_to_pack = _get_untracked_files(root, target_archive_path=archive_path, zenodo=True)
     if not files_to_pack:
         print("[WARNING] No untracked data files found to compress.")
         return archive_path
@@ -312,7 +287,7 @@ def compress(
     ratio = (1.0 - (compressed_bytes / max(1, total_uncompressed_bytes))) * 100.0
 
     print("\n" + "-" * 65)
-    print("[SUCCESS] Archive created successfully:")
+    print("[SUCCESS] Zenodo archive created successfully:")
     print(f"  Path:             {archive_path}")
     print(f"  Files archived:   {len(files_to_pack)}")
     print(f"  Uncompressed size:{total_uncompressed_bytes / (1024 * 1024):.1f} MB")
@@ -326,30 +301,28 @@ def decompress(
     archive_name: str | Path | None = None,
     output_dir: str | Path = "outputs/backups",
     repo_root: str | Path | None = None,
-    zenodo: bool = False,
+    zenodo: bool = True,
 ) -> tuple[bool, Path]:
-    """Extract a specific (or latest) backup zip archive and validate the restored structure.
+    """Extract a Zenodo backup zip archive and validate the restored dataset structure.
 
     Parameters
     ----------
     archive_name : str | Path | None
         Optional filename or path to the zip archive. If None, the most recent
-        archive in the outputs/backups folder is selected automatically (prioritizing
-        Zenodo archives if zenodo=True).
+        Zenodo archive in outputs/backups/ is selected automatically.
     output_dir : str | Path
         Directory containing the archives (default: 'outputs/backups').
     repo_root : str | Path | None
         Root directory of the project repository.
     zenodo : bool
-        If True, validates the restored structure against the academic Zenodo scope
-        (data/, models/, and optimal_features.json), ignoring omitted outputs/ and reports/.
-        If False, automatically infers Zenodo validation if archive name contains 'zenodo'.
+        Maintained for interface compatibility (always True; Zenodo is the sole method).
 
     Returns
     -------
     tuple[bool, Path]
         A tuple of (is_valid_structure, archive_path).
     """
+    del zenodo
     root = _find_repo_root(Path(repo_root) if repo_root else None)
     out_dir = Path(output_dir) if Path(output_dir).is_absolute() else (root / output_dir)
 
@@ -382,37 +355,30 @@ def decompress(
 
         if not found_archives:
             raise FileNotFoundError(
-                f"No backup archives found in {out_dir} (or {root / 'outputs'}). "
-                "Specify an archive using --file or run compression first."
+                f"No Zenodo backup archives found in {out_dir} (or {root / 'outputs'}). "
+                f"Specify an archive using --file or download via 'make fetch-zenodo'."
             )
 
-        # Sort by modification time (most recent first)
+        # Sort by modification time (most recent first), prioritizing Zenodo named archives
         found_archives = sorted(set(found_archives), key=lambda p: p.stat().st_mtime, reverse=True)
-        if zenodo:
-            zenodo_archives = [
-                a for a in found_archives
-                if "zenodo" in a.name.lower() or a.name.startswith("wifi-csi-presence-detection-")
-            ]
-            if zenodo_archives:
-                found_archives = zenodo_archives
-        archive_path = found_archives[0]
+        zenodo_archives = [
+            a for a in found_archives
+            if "zenodo" in a.name.lower() or a.name.startswith("wifi-csi-presence-detection-")
+        ]
+        if zenodo_archives:
+            archive_path = zenodo_archives[0]
+        else:
+            archive_path = found_archives[0]
 
         if len(found_archives) > 1:
-            print(f"Found {len(found_archives)} archives in output folder. Selected latest:")
+            print(f"Found {len(found_archives)} archives in output folder. Selected:")
             for a in found_archives[:5]:
                 marker = " -> [SELECTED]" if a == archive_path else ""
                 mtime_str = datetime.fromtimestamp(a.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
                 print(f"   • {a.name} ({mtime_str}){marker}")
 
-    is_zenodo_scope = (
-        zenodo
-        or ("zenodo" in archive_path.name.lower())
-        or archive_path.name.startswith("wifi-csi-presence-detection-")
-    )
-
     print("=" * 65)
-    header = "  DECOMPRESSING AND RESTORING ZENODO DATASET" if is_zenodo_scope else "  DECOMPRESSING AND RESTORING PROJECT DATA"
-    print(header)
+    print("  DECOMPRESSING AND RESTORING ZENODO DATASET")
     print(f"  Archive:     {archive_path.name}")
     print(f"  Location:    {archive_path}")
     print(f"  Target Root: {root}")
@@ -447,20 +413,19 @@ def decompress(
 
     print(f"\nExtracted {extracted_count} files into repository.")
 
-    # 4. Validate restored structure matches project expectations
+    # 4. Validate restored structure matches Zenodo expectations
     print("\n" + "-" * 65)
-    valid_header = "  VALIDATING RESTORED ZENODO DATASET STRUCTURE" if is_zenodo_scope else "  VALIDATING RESTORED FILE STRUCTURE"
-    print(valid_header)
+    print("  VALIDATING RESTORED ZENODO DATASET STRUCTURE")
     print("-" * 65)
-    is_valid, check_details = _validate_structure(root, zenodo=is_zenodo_scope)
+    is_valid, check_details = _validate_structure(root, zenodo=True)
 
     for check in check_details:
-        prefix = "  ✓ [OK]    " if not check.startswith(("Missing", "data/01_raw: Missing", "models: Missing", "outputs: Missing", "reports: Missing")) else "  ✗ [FAILED]"
+        prefix = "  ✓ [OK]    " if not check.startswith(("Missing", "data/01_raw: Missing", "models: Missing")) else "  ✗ [FAILED]"
         print(f"{prefix} {check}")
 
     print("-" * 65)
     if is_valid:
-        print("[SUCCESS] Decompression complete. Restored file structure matches all expectations.")
+        print("[SUCCESS] Decompression complete. Restored file structure matches all Zenodo expectations.")
     else:
         print("[WARNING] File structure validation found missing or incomplete components.")
     print("=" * 65)
@@ -475,65 +440,62 @@ restore = decompress
 def main() -> None:
     """CLI entrypoint supporting both subcommand and option flag invocations."""
     parser = argparse.ArgumentParser(
-        description="Backup and restore untracked Wi-Fi CSI project data and generated assets."
+        description="Backup and restore Wi-Fi CSI project data using the Zenodo dataset standard."
     )
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
 
     # Command: compress
-    parser_comp = subparsers.add_parser("compress", help="Compress untracked/ignored data into a zip file")
+    parser_comp = subparsers.add_parser("compress", help="Compress data into a Zenodo-compliant zip file")
     parser_comp.add_argument(
         "-f", "--file", dest="filename", type=str, default=None,
-        help=(
-            "Optional archive filename (default: timestamped 'backup_YYYYMMDD_HHMMSS.zip' "
-            f"or '{ZENODO_DEFAULT_ARCHIVE_NAME}' with --zenodo)"
-        ),
+        help=f"Optional archive filename (default: '{ZENODO_DEFAULT_ARCHIVE_NAME}')",
     )
     parser_comp.add_argument(
         "-d", "--dir", "--output-dir", dest="output_dir", type=str, default="outputs/backups",
-        help="Directory where archive will be saved (default: 'outputs/backups')"
+        help="Directory where archive will be saved (default: 'outputs/backups')",
     )
     parser_comp.add_argument(
-        "--zenodo", action="store_true", default=False,
-        help="Filter archive to only include data/, models/, and reports/logs/optimal_features.json for Zenodo publication"
+        "--zenodo", action="store_true", default=True,
+        help="Zenodo standard dataset format (default and exclusive mode)",
     )
 
     # Command: decompress / restore
-    parser_decomp = subparsers.add_parser("decompress", help="Extract and restore data from a zip archive")
+    parser_decomp = subparsers.add_parser("decompress", help="Extract and restore data from a Zenodo zip archive")
     parser_decomp.add_argument(
         "-f", "--file", dest="filename", type=str, default=None,
-        help="Specific archive filename or path to restore (default: latest archive)"
+        help="Specific archive filename or path to restore (default: latest Zenodo archive)",
     )
     parser_decomp.add_argument(
         "-d", "--dir", "--output-dir", dest="output_dir", type=str, default="outputs/backups",
-        help="Directory containing archives (default: 'outputs/backups')"
+        help="Directory containing archives (default: 'outputs/backups')",
     )
     parser_decomp.add_argument(
-        "--zenodo", action="store_true", default=False,
-        help="Validate restored archive against Zenodo academic dataset scope"
+        "--zenodo", action="store_true", default=True,
+        help="Validate restored archive against Zenodo academic dataset scope",
     )
 
     parser_restore = subparsers.add_parser("restore", help="Alias for decompress")
     parser_restore.add_argument(
         "-f", "--file", dest="filename", type=str, default=None,
-        help="Specific archive filename or path to restore (default: latest archive)"
+        help="Specific archive filename or path to restore (default: latest Zenodo archive)",
     )
     parser_restore.add_argument(
         "-d", "--dir", "--output-dir", dest="output_dir", type=str, default="outputs/backups",
-        help="Directory containing archives (default: 'outputs/backups')"
+        help="Directory containing archives (default: 'outputs/backups')",
     )
     parser_restore.add_argument(
-        "--zenodo", action="store_true", default=False,
-        help="Validate restored archive against Zenodo academic dataset scope"
+        "--zenodo", action="store_true", default=True,
+        help="Validate restored archive against Zenodo academic dataset scope",
     )
 
     # Support top-level flags as fallback
-    parser.add_argument("-c", "--compress", action="store_true", help="Compress data files")
-    parser.add_argument("-x", "-r", "--decompress", "--restore", dest="do_restore", action="store_true", help="Restore data files")
+    parser.add_argument("-c", "--compress", action="store_true", help="Compress data files (Zenodo format)")
+    parser.add_argument("-x", "-r", "--decompress", "--restore", dest="do_restore", action="store_true", help="Restore data files (Zenodo format)")
     parser.add_argument("-f", "--file", dest="flag_file", type=str, default=None, help="Archive filename")
     parser.add_argument("-d", "--dir", dest="flag_dir", type=str, default="outputs/backups", help="Output directory")
     parser.add_argument(
-        "--zenodo", dest="flag_zenodo", action="store_true", default=False,
-        help="Filter archive to only include data/, models/, and reports/logs/optimal_features.json for Zenodo publication"
+        "--zenodo", dest="flag_zenodo", action="store_true", default=True,
+        help="Zenodo academic dataset format (default and exclusive mode)",
     )
 
     args = parser.parse_args()
@@ -548,13 +510,11 @@ def main() -> None:
     if command == "compress":
         fname = getattr(args, "filename", None) or args.flag_file
         odir = getattr(args, "output_dir", None) or args.flag_dir
-        zenodo = bool(getattr(args, "zenodo", False) or getattr(args, "flag_zenodo", False))
-        compress(archive_name=fname, output_dir=odir, zenodo=zenodo)
+        compress(archive_name=fname, output_dir=odir, zenodo=True)
     elif command in ("decompress", "restore"):
         fname = getattr(args, "filename", None) or args.flag_file
         odir = getattr(args, "output_dir", None) or args.flag_dir
-        zenodo = bool(getattr(args, "zenodo", False) or getattr(args, "flag_zenodo", False))
-        ok, _ = decompress(archive_name=fname, output_dir=odir, zenodo=zenodo)
+        ok, _ = decompress(archive_name=fname, output_dir=odir, zenodo=True)
         if not ok:
             sys.exit(1)
     else:

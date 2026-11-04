@@ -1,4 +1,4 @@
-"""Unit tests for backup_data.py compression, restoration, and validation."""
+"""Unit tests for backup_data.py compression, restoration, and validation (Zenodo standard)."""
 
 from __future__ import annotations
 
@@ -30,7 +30,8 @@ def test_validate_structure_live_repo() -> None:
     valid, checks = _validate_structure(root)
     assert valid is True
     assert any("Standard & Light model families complete" in c for c in checks)
-    assert any("optimal_features.json verified" in c for c in checks)
+    assert any("optimal_features.json verified (Zenodo academic scope)" in c for c in checks)
+    assert any("outputs: Omitted by design (Zenodo academic dataset scope)" in c for c in checks)
 
 
 def test_validate_structure_missing_optimal_features(tmp_path: Path) -> None:
@@ -59,10 +60,6 @@ def test_validate_structure_missing_optimal_features(tmp_path: Path) -> None:
         bundle.mkdir()
         (bundle / "pipeline.joblib").write_text("joblib")
         (bundle / "model_card.json").write_text("{}")
-
-    # Outputs
-    (mock_root / "outputs/fig").mkdir(parents=True)
-    (mock_root / "outputs/fig/plot.png").write_text("png")
 
     # Reports WITHOUT optimal_features.json
     (mock_root / "reports/tables").mkdir(parents=True)
@@ -98,6 +95,7 @@ def test_compress_and_restore_roundtrip(tmp_path: Path) -> None:
         (bundle / "pipeline.joblib").write_text(f"joblib_{m}")
         (bundle / "model_card.json").write_text(json.dumps({"model_name": m}))
 
+    # Extraneous files that should be excluded under Zenodo standard
     (mock_root / "outputs/plots").mkdir(parents=True)
     (mock_root / "outputs/plots/fig1.png").write_text("png_bytes")
 
@@ -105,19 +103,23 @@ def test_compress_and_restore_roundtrip(tmp_path: Path) -> None:
     (mock_root / "reports/logs/optimal_features.json").write_text(
         json.dumps({"best_standard_model": "mlp", "best_light_model": "gradient_boosting_light"})
     )
+    (mock_root / "reports/logs/evaluation_report.json").write_text("{}")
 
     # 1. Compress
     archive_path = compress(
-        archive_name="test_backup.zip",
+        archive_name="test_zenodo_backup.zip",
         output_dir=mock_root / "outputs/backups",
         repo_root=mock_root,
     )
     assert archive_path.is_file()
 
-    # Inspect zip contents
+    # Inspect zip contents - strictly Zenodo assets
     with zipfile.ZipFile(archive_path, "r") as zf:
         namelist = zf.namelist()
         assert "reports/logs/optimal_features.json" in namelist
+        assert "reports/logs/evaluation_report.json" not in namelist
+        assert not any(f.startswith("outputs/") for f in namelist)
+        assert not any(f.endswith(".png") for f in namelist)
         for m in models:
             assert f"models/{m}.pkl" in namelist
             assert f"models/registry/{m}_bundle/pipeline.joblib" in namelist
@@ -181,18 +183,8 @@ def test_get_untracked_files_zenodo_filtering(tmp_path: Path) -> None:
     (mock_root / "outputs/backups").mkdir(parents=True)
     (mock_root / "outputs/backups/old.zip").write_text("zip")
 
-    # Standard mode (_get_untracked_files with zenodo=False)
-    standard_files = _get_untracked_files(mock_root, zenodo=False)
-    standard_str = {f.as_posix() for f in standard_files}
-    assert "outputs/plots/fig1.png" in standard_str
-    assert "reports/logs/evaluation_report.json" in standard_str
-    assert "reports/figures/confusion_matrix.png" in standard_str
-    assert "reports/tables/results.tex" in standard_str
-    assert "reports/logs/optimal_features.json" in standard_str
-    assert "data/03_processed/figures/class_distribution.png" in standard_str
-
-    # Zenodo mode (_get_untracked_files with zenodo=True)
-    zenodo_files = _get_untracked_files(mock_root, zenodo=True)
+    # Zenodo discovery
+    zenodo_files = _get_untracked_files(mock_root)
     zenodo_str = {f.as_posix() for f in zenodo_files}
 
     # Must contain data/ and models/ and reports/logs/optimal_features.json
@@ -224,12 +216,11 @@ def test_compress_zenodo_default_and_custom_filename(tmp_path: Path) -> None:
     (mock_root / "outputs/plots").mkdir(parents=True)
     (mock_root / "outputs/plots/plot.png").write_text("plot")
 
-    # 1. Default filename with zenodo=True
+    # 1. Default filename automatically uses Zenodo v2.0.0 name
     archive_default = compress(
         archive_name=None,
         output_dir=mock_root / "outputs/backups",
         repo_root=mock_root,
-        zenodo=True,
     )
     assert archive_default.name == ZENODO_DEFAULT_ARCHIVE_NAME
     assert archive_default.name == "wifi-csi-presence-detection-zenodo-2026-v2.0.0.zip"
@@ -248,7 +239,6 @@ def test_compress_zenodo_default_and_custom_filename(tmp_path: Path) -> None:
         archive_name="custom_dataset.zip",
         output_dir=mock_root / "outputs/backups",
         repo_root=mock_root,
-        zenodo=True,
     )
     assert archive_custom.name == "custom_dataset.zip"
     assert archive_custom.is_file()
@@ -265,34 +255,39 @@ def test_compress_zenodo_default_and_custom_filename(tmp_path: Path) -> None:
 def test_cli_compress_zenodo(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[dict[str, object]] = []
 
-    def fake_compress(archive_name=None, output_dir="outputs/backups", repo_root=None, zenodo=False):
+    def fake_compress(archive_name=None, output_dir="outputs/backups", repo_root=None, zenodo=True):
         calls.append({"archive_name": archive_name, "output_dir": output_dir, "zenodo": zenodo})
         return Path(output_dir) / (archive_name or ZENODO_DEFAULT_ARCHIVE_NAME)
 
     monkeypatch.setattr("scripts.backup_data.compress", fake_compress)
 
-    # Test subcommand: compress --zenodo
-    monkeypatch.setattr("sys.argv", ["backup_data.py", "compress", "--zenodo", "-d", "custom_dir"])
+    # Test subcommand: compress (defaults to Zenodo standard)
+    monkeypatch.setattr("sys.argv", ["backup_data.py", "compress", "-d", "custom_dir"])
     main()
     assert len(calls) == 1
-    assert calls[0]["zenodo"] is True
     assert calls[0]["archive_name"] is None
     assert calls[0]["output_dir"] == "custom_dir"
 
-    # Test subcommand with custom -f: compress --zenodo -f custom_export.zip
+    # Test subcommand with --zenodo flag
     calls.clear()
-    monkeypatch.setattr("sys.argv", ["backup_data.py", "compress", "--zenodo", "-f", "custom_export.zip"])
+    monkeypatch.setattr("sys.argv", ["backup_data.py", "compress", "--zenodo", "-d", "custom_dir"])
     main()
     assert len(calls) == 1
-    assert calls[0]["zenodo"] is True
+    assert calls[0]["archive_name"] is None
+    assert calls[0]["output_dir"] == "custom_dir"
+
+    # Test subcommand with custom -f: compress -f custom_export.zip
+    calls.clear()
+    monkeypatch.setattr("sys.argv", ["backup_data.py", "compress", "-f", "custom_export.zip"])
+    main()
+    assert len(calls) == 1
     assert calls[0]["archive_name"] == "custom_export.zip"
 
-    # Test fallback top-level flag: -c --zenodo
+    # Test fallback top-level flag: -c
     calls.clear()
-    monkeypatch.setattr("sys.argv", ["backup_data.py", "-c", "--zenodo"])
+    monkeypatch.setattr("sys.argv", ["backup_data.py", "-c"])
     main()
     assert len(calls) == 1
-    assert calls[0]["zenodo"] is True
     assert calls[0]["archive_name"] is None
 
 
@@ -327,16 +322,11 @@ def test_validate_structure_zenodo_scope(tmp_path: Path) -> None:
     (mock_root / "reports/logs").mkdir(parents=True)
     (mock_root / "reports/logs/optimal_features.json").write_text("{}")
 
-    # Standard validation must fail because outputs/ is missing
-    is_valid_std, checks_std = _validate_structure(mock_root, zenodo=False)
-    assert is_valid_std is False
-    assert any("outputs: Missing" in c for c in checks_std)
-
-    # Zenodo validation must succeed because outputs/ is omitted by design
-    is_valid_zenodo, checks_zenodo = _validate_structure(mock_root, zenodo=True)
-    assert is_valid_zenodo is True
-    assert any("outputs: Omitted by design" in c for c in checks_zenodo)
-    assert any("optimal_features.json verified (Zenodo academic scope)" in c for c in checks_zenodo)
+    # Validation must succeed because outputs/ is omitted by design under Zenodo scope
+    is_valid, checks = _validate_structure(mock_root)
+    assert is_valid is True
+    assert any("outputs: Omitted by design" in c for c in checks)
+    assert any("optimal_features.json verified (Zenodo academic scope)" in c for c in checks)
 
 
 def test_restore_zenodo_roundtrip(tmp_path: Path) -> None:
@@ -371,7 +361,6 @@ def test_restore_zenodo_roundtrip(tmp_path: Path) -> None:
     archive_path = compress(
         output_dir=mock_root / "outputs/backups",
         repo_root=mock_root,
-        zenodo=True,
     )
     assert archive_path.name == ZENODO_DEFAULT_ARCHIVE_NAME
 
@@ -379,43 +368,41 @@ def test_restore_zenodo_roundtrip(tmp_path: Path) -> None:
     (mock_root / "reports/logs/optimal_features.json").unlink()
     (mock_root / "models/mlp.pkl").unlink()
 
-    # Restore archive with zenodo=True
-    is_valid, restored_path = restore(archive_name=archive_path, repo_root=mock_root, zenodo=True)
+    # Restore archive
+    is_valid, restored_path = restore(archive_name=archive_path, repo_root=mock_root)
     assert is_valid is True
     assert restored_path == archive_path
     assert (mock_root / "reports/logs/optimal_features.json").is_file()
-    assert (mock_root / "models/mlp.pkl").is_file()
-
-    # Restore with auto-detection (zenodo=False but archive has 'zenodo' in filename)
-    (mock_root / "models/mlp.pkl").unlink()
-    is_valid_auto, _ = restore(archive_name=archive_path, repo_root=mock_root, zenodo=False)
-    assert is_valid_auto is True
     assert (mock_root / "models/mlp.pkl").is_file()
 
 
 def test_cli_restore_zenodo(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[dict[str, object]] = []
 
-    def fake_decompress(archive_name=None, output_dir="outputs/backups", repo_root=None, zenodo=False):
+    def fake_decompress(archive_name=None, output_dir="outputs/backups", repo_root=None, zenodo=True):
         calls.append({"archive_name": archive_name, "output_dir": output_dir, "zenodo": zenodo})
         return True, Path(output_dir) / (archive_name or ZENODO_DEFAULT_ARCHIVE_NAME)
 
     monkeypatch.setattr("scripts.backup_data.decompress", fake_decompress)
 
-    # Test subcommand: restore --zenodo
-    monkeypatch.setattr("sys.argv", ["backup_data.py", "restore", "--zenodo", "-d", "custom_dir"])
+    # Test subcommand: restore (defaults to Zenodo standard)
+    monkeypatch.setattr("sys.argv", ["backup_data.py", "restore", "-d", "custom_dir"])
     main()
     assert len(calls) == 1
-    assert calls[0]["zenodo"] is True
     assert calls[0]["archive_name"] is None
     assert calls[0]["output_dir"] == "custom_dir"
 
-    # Test subcommand with custom -f: restore --zenodo -f custom_export.zip
+    # Test subcommand with --zenodo flag
     calls.clear()
-    monkeypatch.setattr("sys.argv", ["backup_data.py", "restore", "--zenodo", "-f", "custom_export.zip"])
+    monkeypatch.setattr("sys.argv", ["backup_data.py", "restore", "--zenodo", "-d", "custom_dir"])
     main()
     assert len(calls) == 1
-    assert calls[0]["zenodo"] is True
+    assert calls[0]["archive_name"] is None
+    assert calls[0]["output_dir"] == "custom_dir"
+
+    # Test subcommand with custom -f: restore -f custom_export.zip
+    calls.clear()
+    monkeypatch.setattr("sys.argv", ["backup_data.py", "restore", "-f", "custom_export.zip"])
+    main()
+    assert len(calls) == 1
     assert calls[0]["archive_name"] == "custom_export.zip"
-
-

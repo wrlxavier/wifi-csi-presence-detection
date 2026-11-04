@@ -48,6 +48,9 @@ wifi-csi-presence-detection/
 │       ├── valid_subcarrier_mapping.csv # Retained subcarrier indices mapping
 │       └── splits/                     # train.parquet, val.parquet, test.parquet (70/15/15)
 ├── docs/                               # Project documentation
+│   ├── FEATURE_MINIMIZATION.md         # Spectral subcarrier minimization study
+│   ├── MATHEMATICAL_FORMULATIONS.md    # Formal mathematical formulation of pipeline
+│   ├── REFERENCES.md                   # Complete academic references & monograph citations
 │   └── ZENODO.md                       # Zenodo dataset download & restoration guide
 ├── models/                             # Trained models & registry
 │   ├── registry/                       # Bundled pipelines (pipeline.joblib + model_card.json)
@@ -77,7 +80,7 @@ wifi-csi-presence-detection/
 │   ├── tables/                         # LaTeX (.tex) and CSV tables for thesis
 │   └── logs/                           # Automated pipeline & evaluation JSON logs
 ├── scripts/                            # Automation & live inference tools
-│   ├── backup_data.py                  # Compress (full backup / Zenodo export) and restore project data
+│   ├── backup_data.py                  # Package and restore project data using Zenodo dataset standard
 │   └── realtime_presence.py            # Live real-time CSI presence detection monitor
 ├── src/                                # Installable Python package (uv pip install -e .)
 │   ├── wifi_csi/                       # Core modular package
@@ -145,49 +148,38 @@ make live
 # or directly: uv run python scripts/realtime_presence.py
 ```
 
-### 5. Data Backup & Recovery (Untracked Assets)
+### 5. Data Backup & Recovery (Zenodo Dataset Standard)
 
-Large raw datasets, model pickles, reports, and generated images are excluded from Git via `.gitignore`. You can create and restore self-contained `.zip` backup archives stored in `outputs/backups/`:
+To maintain absolute consistency with the official published dataset on Zenodo ([record 23960575](https://zenodo.org/records/23960575)) and eliminate ambiguity, the project exclusively uses the **Zenodo dataset standard** for data packaging, backup, and restoration.
+
+Under this standard:
+* **Included:** Raw session recordings (`data/01_raw/`), processed canonical datasets and splits (`data/03_processed/`), trained model checkpoints and deployable bundles (`models/`), and subcarrier optimization metadata (`reports/logs/optimal_features.json`).
+* **Excluded:** Bulky evaluation artifacts (`outputs/`) and figure image plots (`reports/figures/`), keeping archives clean, lightweight, and strictly focused on reproducible data and models.
 
 ```bash
-# Compress all untracked data/models/reports into a timestamped zip in outputs/backups/
+# Package untracked data and models into the Zenodo-compliant archive
+# Output: outputs/backups/wifi-csi-presence-detection-zenodo-2026-v2.0.0.zip
 make compress
 # or directly: uv run python scripts/backup_data.py compress
 
-# Compress with a custom archive name
-make compress ARCHIVE=my_backup.zip
-# or directly: uv run python scripts/backup_data.py compress --file my_backup.zip
+# Package with a custom archive name
+make compress ARCHIVE=my_dataset.zip
+# or directly: uv run python scripts/backup_data.py compress --file my_dataset.zip
 
-# Export academic dataset for Zenodo (only data/, models/, and optimal_features.json)
-# Default output: outputs/backups/wifi-csi-presence-detection-zenodo-2026-v2.0.0.zip
-make zenodo
-# or directly: uv run python scripts/backup_data.py compress --zenodo
-
-# Export Zenodo dataset with a custom archive name
-make zenodo ARCHIVE=my_zenodo_dataset.zip
-# or directly: uv run python scripts/backup_data.py compress --zenodo --file my_zenodo_dataset.zip
-
-# Restore from the latest archive in outputs/backups/ and validate file structure
+# Restore from the Zenodo dataset archive in outputs/backups/ and validate file structure
 make restore
 # or directly: uv run python scripts/backup_data.py restore
 
 # Restore a specific archive version
-make restore ARCHIVE=my_backup.zip
-# or directly: uv run python scripts/backup_data.py restore --file my_backup.zip
+make restore ARCHIVE=my_dataset.zip
+# or directly: uv run python scripts/backup_data.py restore --file my_dataset.zip
 
-# Restore from a Zenodo academic archive (validates data/, models/, and optimal_features.json)
-make restore-zenodo
-# or directly: uv run python scripts/backup_data.py restore --zenodo
-# (Archives containing 'zenodo' in their filename are also automatically validated under the Zenodo scope)
-
-# Download and restore official dataset from Zenodo in a single step:
+# Download and restore official v2.0.0 dataset directly from Zenodo in a single step:
 make fetch-zenodo
 ```
 
-The restoration process verifies archive integrity (CRC-32), extracts files to their original repository paths, and validates that all expected project components (`data/01_raw/`, `data/03_processed/splits/`, `models/`, `outputs/`, `reports/`) are present and intact.
+The restoration process verifies archive integrity (CRC-32), protects against path traversal (Zip Slip), extracts files to their original repository paths, and validates that all essential project components (`data/01_raw/`, `data/03_processed/splits/`, `models/`, and `reports/logs/optimal_features.json`) are intact.
 
-> **Academic Export (`--zenodo`):** When generating archives for open science repositories like Zenodo, `--zenodo` restricts the archive scope strictly to raw and processed datasets (`data/`), trained model bundles and checkpoints (`models/`), and feature selection metadata (`reports/logs/optimal_features.json`). Bulky evaluation outputs (`outputs/`) and publication figure plots (`reports/figures/`) are strictly excluded to optimize package size.
->
 > For full instructions on downloading, checksum verification, and Zenodo dataset management, see the [Zenodo Integration Guide](docs/ZENODO.md).
 
 ## Hardware
@@ -201,6 +193,4 @@ The restoration process verifies archive integrity (CRC-32), extracts files to t
 
 ## References
 
-- Hernandez & Bulut (2022) - *WiFi Sensing on the Edge*, IEEE COMST. [DOI](https://doi.org/10.1109/COMST.2022.3209144)
-- Natarajan et al. (2023) - *Passive Human Motion Detection Using WiFi*, IEEE TIM. [DOI](https://doi.org/10.1109/TIM.2023.3272374)
-- Wong et al. (2024) - *SHD-HAR Dataset*, Data in Brief. [DOI](https://doi.org/10.1016/j.dib.2024.110673)
+For the complete academic bibliography, monograph citations, and related works supporting this research, see [docs/REFERENCES.md](docs/REFERENCES.md).

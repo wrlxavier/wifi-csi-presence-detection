@@ -58,8 +58,8 @@ wget -O outputs/backups/wifi-csi-presence-detection-zenodo-2026-v2.0.0.zip \
 Extract files into their project paths and verify integrity:
 
 ```bash
-make restore-zenodo
-# or directly: uv run python scripts/backup_data.py restore --zenodo
+make restore
+# or directly: uv run python scripts/backup_data.py restore
 ```
 
 ---
@@ -75,7 +75,7 @@ make restore-zenodo
    ```
 4. Restore and validate the archive:
    ```bash
-   make restore-zenodo
+   make restore
    ```
 
 ---
