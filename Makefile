@@ -1,6 +1,10 @@
-.PHONY: help install test live live-reduced live-light live-svm-light live-mlp-light live-rf-light live-gb-light clean compress backup restore decompress
+.PHONY: help install test live live-reduced live-light live-svm-light live-mlp-light live-rf-light live-gb-light clean compress backup restore decompress zenodo compress-zenodo restore-zenodo decompress-zenodo download-zenodo fetch-zenodo
 
 UV := uv
+
+ZENODO_RECORD_ID := 23960575
+ZENODO_FILE := wifi-csi-presence-detection-zenodo-2026-v2.0.0.zip
+ZENODO_URL := https://zenodo.org/records/$(ZENODO_RECORD_ID)/files/$(ZENODO_FILE)?download=1
 
 # Optional target archive argument: make compress ARCHIVE=my_backup.zip or FILE=...
 ARCHIVE_ARG := $(if $(ARCHIVE),--file "$(ARCHIVE)",$(if $(FILE),--file "$(FILE)",))
@@ -16,8 +20,13 @@ help:
 	@echo "  make live-mlp-light- Launch real-time presence detection with lightweight MLP (3 us, 5 SCs)"
 	@echo "  make live-rf-light - Launch real-time presence detection with lightweight Random Forest (5 SCs)"
 	@echo "  make live-gb-light - Launch real-time presence detection with lightweight Gradient Boosting (5 SCs)"
-	@echo "  make compress      - Compress untracked/ignored data into outputs/backups/ (opt: ARCHIVE=name.zip)"
-	@echo "  make restore       - Restore data from compressed archive in outputs/backups/ (opt: ARCHIVE=name.zip)"
+	@echo "  make compress      - Package Zenodo academic dataset archive into outputs/backups/ (opt: ARCHIVE=name.zip)"
+	@echo "  make zenodo        - Alias for compress"
+	@echo "  make compress-zenodo- Alias for compress"
+	@echo "  make download-zenodo- Download official dataset archive from Zenodo (record 23960575)"
+	@echo "  make restore       - Restore and validate Zenodo dataset archive (opt: ARCHIVE=name.zip)"
+	@echo "  make restore-zenodo- Alias for restore"
+	@echo "  make fetch-zenodo  - Download and restore Zenodo dataset in one step"
 	@echo "  make clean         - Clean cache and transient build files"
 
 install:
@@ -51,10 +60,26 @@ compress:
 
 backup: compress
 
+compress-zenodo: compress
+
+zenodo: compress
+
 restore:
 	$(UV) run python scripts/backup_data.py restore $(ARCHIVE_ARG)
 
 decompress: restore
+
+restore-zenodo: restore
+
+decompress-zenodo: restore
+
+download-zenodo:
+	@mkdir -p outputs/backups
+	@echo "Downloading $(ZENODO_FILE) from Zenodo (record $(ZENODO_RECORD_ID))..."
+	curl -L -o outputs/backups/$(ZENODO_FILE) "$(ZENODO_URL)"
+	@echo "Download complete: outputs/backups/$(ZENODO_FILE)"
+
+fetch-zenodo: download-zenodo restore
 
 
 clean:

@@ -3,6 +3,7 @@
 from pathlib import Path
 from datetime import datetime, timezone
 import time
+from typing import Any
 import serial
 
 
