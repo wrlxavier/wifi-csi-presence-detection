@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from scripts.realtime_presence import (
     build_menu_aliases,
     discover_available_models,
@@ -45,9 +47,45 @@ def test_format_duration():
 
 def test_find_serial_port_explicit():
     assert find_serial_port("/dev/ttyTest") == "/dev/ttyTest"
+    assert find_serial_port("COM3") == "COM3"
+    assert find_serial_port("/dev/cu.usbserial-0001") == "/dev/cu.usbserial-0001"
+
+
+def test_find_serial_port_cross_platform_auto(monkeypatch):
+    class DummyPort:
+        def __init__(self, device, description="", manufacturer="", hwid="", vid=None):
+            self.device = device
+            self.description = description
+            self.manufacturer = manufacturer
+            self.hwid = hwid
+            self.vid = vid
+
+    # Windows COM port with Espressif VID (0x303A)
+    monkeypatch.setattr(
+        "serial.tools.list_ports.comports",
+        lambda: [
+            DummyPort("COM1", description="Communications Port"),
+            DummyPort("COM4", description="USB JTAG/serial debug unit", vid=0x303A),
+        ],
+    )
+    assert find_serial_port("auto") == "COM4"
+
+    # macOS cu.usbmodem port
+    monkeypatch.setattr(
+        "serial.tools.list_ports.comports",
+        lambda: [DummyPort("/dev/cu.usbmodem1101", description="USB Serial")],
+    )
+    assert find_serial_port("auto") == "/dev/cu.usbmodem1101"
+
+
+def _require_restored_models() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    if not (repo_root / "models/registry/mlp_bundle/pipeline.joblib").exists():
+        pytest.skip("Zenodo dataset/models not restored yet. Run 'make fetch-zenodo' first.")
 
 
 def test_realtime_csi_inference_init():
+    _require_restored_models()
     engine = RealtimeCSIInference(port="/dev/ttyUSB0", min_samples=5)
     assert engine.model_name in ["mlp", "random_forest", "svm", "gradient_boosting"]
     assert engine.pipeline is not None
@@ -63,6 +101,7 @@ def test_realtime_csi_inference_init():
 
 
 def test_realtime_csi_inference_tumbling_mode():
+    _require_restored_models()
     engine = RealtimeCSIInference(port="/dev/ttyUSB0", window_mode="tumbling", window_seconds=2.0)
     assert engine.window_mode == "tumbling"
     assert engine.window_seconds == 2.0
@@ -209,6 +248,7 @@ def test_prompt_model_selection(monkeypatch):
 
 
 def test_realtime_csi_inference_reduced_model():
+    _require_restored_models()
     # 'reduced' and 'optimal_reduced' both resolve to the best light model (gradient_boosting_light)
     engine = RealtimeCSIInference(port="/dev/ttyUSB0", model_name="reduced", min_samples=5)
     assert engine.model_name == "gradient_boosting_light"
@@ -226,6 +266,7 @@ def test_realtime_csi_inference_reduced_model():
 
 
 def test_realtime_csi_inference_light_family():
+    _require_restored_models()
     light_models = ["mlp_light", "svm_light", "random_forest_light", "gradient_boosting_light"]
     for m in light_models:
         engine = RealtimeCSIInference(port="/dev/ttyUSB0", model_name=m, min_samples=5)

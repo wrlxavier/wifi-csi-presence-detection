@@ -1,6 +1,6 @@
-# Zenodo Dataset Integration Guide
+# Zenodo Dataset & Model Integration Guide
 
-This guide explains how to automatically download and restore the official research dataset published on **Zenodo** into your local clone of this repository.
+This guide explains how to download, restore, and package the official research dataset and trained models published on **Zenodo** across **Linux**, **macOS**, and **Windows**.
 
 ---
 
@@ -14,92 +14,121 @@ This guide explains how to automatically download and restore the official resea
 
 ---
 
-## 2. Automatic Setup (Recommended)
+## 2. Automatic One-Step Setup (Recommended)
 
-You can download and restore the complete dataset into the repository in a single automated step:
+After running `make install` (or `.\make install` on Windows), you can download, checksum-verify, and restore the entire dataset and model registry in a single step:
 
-```bash
-make fetch-zenodo
-```
+* **Linux & macOS:**
+  ```bash
+  make fetch-zenodo
+  ```
+* **Windows (PowerShell or CMD):**
+  ```powershell
+  .\make fetch-zenodo
+  # or: .\make.ps1 fetch-zenodo
+  ```
+* **Direct `uv` command (All OSes):**
+  ```bash
+  uv run python scripts/backup_data.py fetch
+  ```
 
-This command will:
-1. Download `wifi-csi-presence-detection-zenodo-2026-v2.0.0.zip` directly from Zenodo into `outputs/backups/`.
-2. Extract all raw recordings, processed splits, model checkpoints, and feature selection metadata to their canonical paths.
-3. Validate repository integrity and component structure automatically.
+This command uses Python's cross-platform `urllib.request` and `zipfile` modules (no external `curl` or `wget` required) to:
+1. Download `wifi-csi-presence-detection-zenodo-2026-v2.0.0.zip` from Zenodo into `outputs/backups/`.
+2. Verify the MD5 digest (`e4ccadccdcf58f8b6401cc10c2a3e48e`) and ZIP CRC-32 integrity.
+3. Prevent path traversal (`Zip Slip`) and extract all files into their canonical repository locations.
+4. Validate that all raw campaigns, processed splits, trained models, and feature selection logs are intact.
 
 ---
 
 ## 3. Step-by-Step Command Line Setup
 
-If you prefer to run each step individually:
+If you prefer to run the download and extraction steps separately:
 
-### Step 1: Download Archive
+### Step 1: Download Archive Only
 
-Using `make`:
-```bash
-make download-zenodo
-```
-
-Or using `curl` / `wget`:
-```bash
-mkdir -p outputs/backups
-
-# Using curl:
-curl -L -o outputs/backups/wifi-csi-presence-detection-zenodo-2026-v2.0.0.zip \
-  "https://zenodo.org/records/23960575/files/wifi-csi-presence-detection-zenodo-2026-v2.0.0.zip?download=1"
-
-# Or using wget:
-wget -O outputs/backups/wifi-csi-presence-detection-zenodo-2026-v2.0.0.zip \
-  "https://zenodo.org/records/23960575/files/wifi-csi-presence-detection-zenodo-2026-v2.0.0.zip?download=1"
-```
+* **Linux / macOS:**
+  ```bash
+  make download-zenodo
+  ```
+* **Windows:**
+  ```powershell
+  .\make download-zenodo
+  ```
+* **Direct `uv` command:**
+  ```bash
+  uv run python scripts/backup_data.py download
+  ```
 
 ### Step 2: Restore and Validate Structure
 
-Extract files into their project paths and verify integrity:
-
-```bash
-make restore
-# or directly: uv run python scripts/backup_data.py restore
-```
+* **Linux / macOS:**
+  ```bash
+  make restore
+  ```
+* **Windows:**
+  ```powershell
+  .\make restore
+  ```
+* **Direct `uv` command:**
+  ```bash
+  uv run python scripts/backup_data.py restore
+  ```
 
 ---
 
 ## 4. Manual Browser Download (Alternative)
 
 1. Open the Zenodo record in your browser: [https://zenodo.org/records/23960575](https://zenodo.org/records/23960575).
-2. In the **Files** section, click **Download** on `wifi-csi-presence-detection-zenodo-2026-v2.0.0.zip`.
-3. Move the downloaded `.zip` file into the `outputs/backups/` folder of this repository:
-   ```bash
-   mkdir -p outputs/backups
-   mv ~/Downloads/wifi-csi-presence-detection-zenodo-2026-v2.0.0.zip outputs/backups/
-   ```
-4. Restore and validate the archive:
-   ```bash
-   make restore
-   ```
+2. Under the **Files** section, click **Download** next to `wifi-csi-presence-detection-zenodo-2026-v2.0.0.zip`.
+3. Place the downloaded `.zip` file inside `outputs/backups/` in the repository root.
+4. Run the restoration command:
+   * **Linux / macOS:** `make restore`
+   * **Windows:** `.\make restore`
+   * **Direct `uv`:** `uv run python scripts/backup_data.py restore`
 
 ---
 
-## 5. Restored Project Components
+## 5. Zenodo Dataset Standard Scope (What is Included vs. Excluded)
 
-Once restored, the following assets are immediately available:
+To maintain consistency with the official Zenodo deposit and keep archives lightweight, [`scripts/backup_data.py`](../scripts/backup_data.py) enforces the **Zenodo Dataset Standard**:
 
-| Directory / File | Description |
-|---|---|
-| `data/01_raw/` | Raw CSI session CSV recordings and JSON metadata sidecars across campaigns (`first_test`, `pilot`, `main`, `generalization`). |
-| `data/03_processed/` | Canonical feature tables (`features_ht40.parquet`, `features_ht40.csv`), subcarrier mapping (`valid_subcarrier_mapping.csv`), and train/val/test splits (`splits/*.parquet`). |
-| `models/` | Trained scikit-learn model checkpoints (`.pkl`), fitted `StandardScaler`, and deployable pipeline bundles (`models/registry/*_bundle`). |
-| `reports/logs/optimal_features.json` | Subcarrier index mappings and benchmark metadata for lightweight model deployment. |
+| Category | Path | Status | Description |
+| :--- | :--- | :---: | :--- |
+| **Raw CSI Sessions** | `data/01_raw/` | **Included** | Raw CSV packet captures and `_meta.json` sidecars across `first_test`, `pilot`, `main`, and `generalization` campaigns. |
+| **Processed Datasets** | `data/03_processed/` | **Included** | Canonical feature tables (`features_ht40.parquet`, `features_ht40.csv`), `valid_subcarrier_mapping.csv`, and stratified `splits/{train,val,test}.parquet`. |
+| **Trained Models** | `models/` | **Included** | Standalone `.pkl` estimators, fitted `scaler.pkl`, and versioned registry bundles (`models/registry/*_bundle/`) for both Standard (162 SCs) and Light (5 SCs) model families. |
+| **Subcarrier Metadata** | `reports/logs/optimal_features.json` | **Included** | Optimal 5-subcarrier indices (`[48, 47, 49, 54, 18]`) and ablation benchmark metrics. |
+| **Transient Plots & Outputs** | `outputs/`, `reports/figures/` | **Excluded** | Bulky diagnostic plots and figure images are omitted by design and can be regenerated by running the notebooks. |
 
 ---
 
-## 6. Verification
+## 6. Packaging Local Changes into a Backup Archive
 
-To verify that the dataset and models are fully functional, run the automated test suite:
+If you collect new CSI sessions or retrain models and want to create a new Zenodo-compliant `.zip` archive in `outputs/backups/`:
 
 ```bash
-make test
-# or directly: uv run pytest
+# Default archive name (outputs/backups/wifi-csi-presence-detection-zenodo-2026-v2.0.0.zip):
+make compress          # Linux / macOS
+.\make compress        # Windows
+uv run python scripts/backup_data.py compress
+
+# Custom archive filename:
+make compress ARCHIVE=my_dataset_backup.zip          # Linux / macOS
+.\make compress my_dataset_backup.zip                # Windows
+uv run python scripts/backup_data.py compress --file my_dataset_backup.zip
+
+# Restore a specific custom archive:
+make restore ARCHIVE=my_dataset_backup.zip           # Linux / macOS
+.\make restore my_dataset_backup.zip                 # Windows
+uv run python scripts/backup_data.py restore --file my_dataset_backup.zip
 ```
 
-All unit and integration tests should pass without errors.
+---
+
+## 7. Verification
+
+After restoring the dataset, run the automated test suite to verify that all data loaders, feature extractors, and model bundles work properly:
+
+* **Linux / macOS:** `make test`
+* **Windows:** `.\make test`
+* **Direct `uv`:** `uv run pytest tests/ -v`

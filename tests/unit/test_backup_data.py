@@ -13,6 +13,7 @@ from scripts.backup_data import (
     _find_repo_root,
     _get_untracked_files,
     _validate_structure,
+    clean_caches,
     compress,
     main,
     restore,
@@ -27,6 +28,8 @@ def test_find_repo_root() -> None:
 
 def test_validate_structure_live_repo() -> None:
     root = _find_repo_root()
+    if not (root / "models/registry/mlp_bundle/pipeline.joblib").exists():
+        pytest.skip("Zenodo dataset/models not restored yet. Run 'make fetch-zenodo' first.")
     valid, checks = _validate_structure(root)
     assert valid is True
     assert any("Standard & Light model families complete" in c for c in checks)
@@ -406,3 +409,20 @@ def test_cli_restore_zenodo(monkeypatch: pytest.MonkeyPatch) -> None:
     main()
     assert len(calls) == 1
     assert calls[0]["archive_name"] == "custom_export.zip"
+
+
+def test_clean_caches(tmp_path: Path) -> None:
+    mock_root = tmp_path / "mock_clean_repo"
+    mock_root.mkdir()
+    (mock_root / "src/__pycache__").mkdir(parents=True)
+    (mock_root / "src/mod.pyc").write_text("pyc", encoding="utf-8")
+    (mock_root / ".pytest_cache").mkdir()
+    (mock_root / "build").mkdir()
+
+    removed = clean_caches(repo_root=mock_root)
+    assert removed >= 4
+    assert not (mock_root / "src/__pycache__").exists()
+    assert not (mock_root / "src/mod.pyc").exists()
+    assert not (mock_root / ".pytest_cache").exists()
+    assert not (mock_root / "build").exists()
+

@@ -123,7 +123,7 @@ def load_session_metadata(meta_dir: str | Path) -> pd.DataFrame:
     rows = []
     for meta_path in sorted(meta_dir.glob("*_meta.json")):
         session_id = meta_path.name.split("_")[1]
-        meta = json.loads(meta_path.read_text())
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
         setup = meta.get("setup", {})
         nodes = setup.get("nodes", {})
         subject = setup.get("protocol", {}).get("subject_position", {})

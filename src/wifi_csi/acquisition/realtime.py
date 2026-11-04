@@ -55,35 +55,56 @@ def format_duration(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 
-def find_serial_port(preferred_port: str | None = None) -> str:
+def _normalize_macos_port(device: str) -> str:
+    """Prefer macOS call-out (/dev/cu.*) over dial-in (/dev/tty.*) devices to avoid DCD blocking."""
+    if device.startswith(("/dev/tty.usb", "/dev/tty.SLAB", "/dev/tty.wch")):
+        cu_device = device.replace("/dev/tty.", "/dev/cu.", 1)
+        if Path(cu_device).exists():
+            return cu_device
+    return device
 
-    """Auto-detect the active ESP32 / serial port connected to the computer."""
+
+def find_serial_port(preferred_port: str | None = None) -> str:
+    """Auto-detect the active ESP32-S3 serial port across Linux, macOS, and Windows."""
     if preferred_port and preferred_port != "auto":
         return preferred_port
 
-    # Scan available ports
+    # Scan available ports across Linux, macOS, and Windows
     ports = list(serial.tools.list_ports.comports())
     if not ports:
-        # Fallback to standard device paths if comports is empty
+        # Fallback to standard POSIX/macOS device paths if comports is empty
         for candidate in ["/dev/ttyUSB0", "/dev/ttyACM0"]:
             if Path(candidate).exists():
                 return candidate
-        raise ConnectionError("No serial devices detected on system.")
+        raise ConnectionError(
+            "No serial devices detected on system. Connect the ESP32-S3 RX node via USB "
+            "or specify the port explicitly (e.g., --port /dev/ttyUSB0 on Linux, "
+            "--port COM3 on Windows, or --port /dev/cu.usbserial-0001 on macOS)."
+        )
 
-    # 1. Look for known ESP32 / USB-to-UART identifiers
-    esp_keywords = ["CP210", "CH340", "USB", "ESP", "UART", "Silicon Labs", "FTDI"]
+    # 1. Look for known ESP32-S3 / USB-to-UART USB Vendor IDs or description keywords
+    # VIDs: Espressif (0x303A), Silicon Labs CP210x (0x10C4), QinHeng CH34x (0x1A86), FTDI (0x0403)
+    known_vids = {0x303A, 0x10C4, 0x1A86, 0x0403}
+    esp_keywords = [
+        "CP210", "CH340", "CH343", "CH9102", "USB", "ESP", "UART",
+        "SILICON LABS", "FTDI", "JTAG", "USBMODEM", "USBSERIAL", "SLAB_USBTOUART",
+    ]
     for p in ports:
-        desc = f"{p.description} {p.manufacturer or ''} {p.hwid}".upper()
-        if any(kw.upper() in desc for kw in esp_keywords):
-            return p.device
+        vid = getattr(p, "vid", None)
+        desc = f"{p.description or ''} {p.manufacturer or ''} {p.hwid or ''} {p.device or ''}".upper()
+        if (vid in known_vids) or any(kw in desc for kw in esp_keywords):
+            return _normalize_macos_port(p.device)
 
-    # 2. Check /dev/ttyUSB* or /dev/ttyACM*
+    # 2. Check OS-specific USB serial device patterns (Linux, macOS, Windows)
     for p in ports:
-        if "ttyUSB" in p.device or "ttyACM" in p.device:
-            return p.device
+        dev = p.device
+        if any(pat in dev for pat in ("ttyUSB", "ttyACM", "cu.usb", "cu.SLAB", "cu.wch", "tty.usb")):
+            return _normalize_macos_port(dev)
+        if dev.upper().startswith("COM") and dev.upper() != "COM1":
+            return dev
 
     # 3. Fallback to first available port
-    return ports[0].device
+    return _normalize_macos_port(ports[0].device)
 
 
 class RealtimeCSIInference:

@@ -2,7 +2,10 @@
 """Real-time Wi-Fi CSI Presence Detection live monitor."""
 
 import argparse
+import contextlib
 import json
+import os
+import platform
 import re
 import shutil
 import sys
@@ -18,6 +21,28 @@ from wifi_csi.acquisition.realtime import (
     make_bar,
     make_bipolar_gauge,
 )
+
+
+def configure_cross_platform_terminal() -> None:
+    """Enable UTF-8 output and ANSI virtual terminal sequences across Windows, Linux, and macOS."""
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            with contextlib.suppress(Exception):
+                enc = getattr(stream, "encoding", None)
+                if enc and enc.lower().replace("-", "") != "utf8":
+                    stream.reconfigure(encoding="utf-8", errors="replace")
+
+    if platform.system() == "Windows":
+        os.system("")  # Trigger Windows console VT initialization
+        with contextlib.suppress(Exception):
+            import ctypes
+
+            kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+            handle = kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE = -11
+            mode = ctypes.c_ulong()
+            if kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+                # ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+                kernel32.SetConsoleMode(handle, mode.value | 0x0004)
 
 # ANSI Colors and Formatting
 RESET = "\033[0m"
@@ -772,6 +797,7 @@ def prompt_model_selection(repo_root: Path, plain_mode: bool = False) -> str:
 
 
 def main() -> None:
+    configure_cross_platform_terminal()
     parser = argparse.ArgumentParser(
         description="Real-time Wi-Fi CSI Presence Detection live monitor.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -780,7 +806,7 @@ def main() -> None:
         "--port",
         type=str,
         default="auto",
-        help="Serial port device (e.g. /dev/ttyUSB0, /dev/ttyACM0, or 'auto')",
+        help="Serial port device (e.g. /dev/ttyUSB0 on Linux, COM3 on Windows, /dev/cu.usbserial-0001 on macOS, or 'auto')",
     )
     parser.add_argument(
         "--baud",

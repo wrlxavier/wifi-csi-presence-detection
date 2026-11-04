@@ -7,11 +7,14 @@ from typing import Any
 import serial
 
 
+from wifi_csi.acquisition.realtime import find_serial_port
+
+
 class CSISerialReader:
     """Manages serial connection to ESP32-S3 RX node for CSI logging."""
 
     def __init__(self, port: str = "/dev/ttyACM0", baudrate: int = 921600, timeout: float = 2.0):
-        self.port = port
+        self.port = find_serial_port(port) if port == "auto" else port
         self.baudrate = baudrate
         self.timeout = timeout
         self.ser: serial.Serial | None = None

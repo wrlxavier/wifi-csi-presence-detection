@@ -14,14 +14,34 @@ This script provides two primary functions adhering strictly to the Zenodo v2.0.
 from __future__ import annotations
 
 import argparse
-from datetime import datetime
+import contextlib
+import hashlib
 import os
-from pathlib import Path
+import shutil
 import subprocess
 import sys
+import urllib.request
 import zipfile
+from datetime import datetime, timezone
+from pathlib import Path
 
+ZENODO_RECORD_ID = "23960575"
 ZENODO_DEFAULT_ARCHIVE_NAME = "wifi-csi-presence-detection-zenodo-2026-v2.0.0.zip"
+ZENODO_DEFAULT_URL = (
+    f"https://zenodo.org/records/{ZENODO_RECORD_ID}/files/{ZENODO_DEFAULT_ARCHIVE_NAME}?download=1"
+)
+ZENODO_EXPECTED_MD5 = "e4ccadccdcf58f8b6401cc10c2a3e48e"
+
+
+def _configure_console_utf8() -> None:
+    """Ensure stdout/stderr support UTF-8 characters across Windows, Linux, and macOS."""
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            with contextlib.suppress(Exception):
+                enc = getattr(stream, "encoding", None)
+                if enc and enc.lower().replace("-", "") != "utf8":
+                    stream.reconfigure(encoding="utf-8", errors="replace")
+
 
 
 def _find_repo_root(start_path: Path | None = None) -> Path:
@@ -242,6 +262,7 @@ def compress(
         Absolute path to the created zip archive.
     """
     del zenodo
+    _configure_console_utf8()
     root = _find_repo_root(Path(repo_root) if repo_root else None)
     out_dir = Path(output_dir) if Path(output_dir).is_absolute() else (root / output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -323,6 +344,7 @@ def decompress(
         A tuple of (is_valid_structure, archive_path).
     """
     del zenodo
+    _configure_console_utf8()
     root = _find_repo_root(Path(repo_root) if repo_root else None)
     out_dir = Path(output_dir) if Path(output_dir).is_absolute() else (root / output_dir)
 
@@ -374,7 +396,11 @@ def decompress(
             print(f"Found {len(found_archives)} archives in output folder. Selected:")
             for a in found_archives[:5]:
                 marker = " -> [SELECTED]" if a == archive_path else ""
-                mtime_str = datetime.fromtimestamp(a.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+                mtime_str = (
+                    datetime.fromtimestamp(a.stat().st_mtime, tz=timezone.utc)
+                    .astimezone()
+                    .strftime("%Y-%m-%d %H:%M:%S")
+                )
                 print(f"   • {a.name} ({mtime_str}){marker}")
 
     print("=" * 65)
@@ -437,10 +463,168 @@ def decompress(
 restore = decompress
 
 
+def download(
+    url: str = ZENODO_DEFAULT_URL,
+    archive_name: str | Path | None = None,
+    output_dir: str | Path = "outputs/backups",
+    repo_root: str | Path | None = None,
+    expected_md5: str | None = ZENODO_EXPECTED_MD5,
+) -> Path:
+    """Download the official Zenodo dataset archive in a cross-platform manner (Windows/Linux/macOS).
+
+    Parameters
+    ----------
+    url : str
+        Direct download URL for the Zenodo dataset archive.
+    archive_name : str | Path | None
+        Target filename for the downloaded archive (defaults to ZENODO_DEFAULT_ARCHIVE_NAME).
+    output_dir : str | Path
+        Directory where the archive will be saved (default: 'outputs/backups').
+    repo_root : str | Path | None
+        Root directory of the project repository.
+    expected_md5 : str | None
+        Optional MD5 hash to verify archive integrity after download.
+
+    Returns
+    -------
+    Path
+        Absolute path to the downloaded zip archive.
+    """
+    _configure_console_utf8()
+    root = _find_repo_root(Path(repo_root) if repo_root else None)
+    out_dir = Path(output_dir) if Path(output_dir).is_absolute() else (root / output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    if archive_name:
+        p_name = Path(archive_name)
+        if p_name.is_absolute():
+            archive_path = p_name
+        elif len(p_name.parts) > 1:
+            archive_path = root / p_name
+        else:
+            fname = p_name.name if p_name.suffix.lower() == ".zip" else f"{p_name.name}.zip"
+            archive_path = out_dir / fname
+    else:
+        archive_path = out_dir / ZENODO_DEFAULT_ARCHIVE_NAME
+
+    archive_path.parent.mkdir(parents=True, exist_ok=True)
+
+    print("=" * 65)
+    print("  DOWNLOADING ZENODO ACADEMIC DATASET")
+    print(f"  Record ID:   {ZENODO_RECORD_ID}")
+    print(f"  Source URL:  {url}")
+    print(f"  Destination: {archive_path.relative_to(root) if archive_path.is_relative_to(root) else archive_path}")
+    print("=" * 65)
+
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "wifi-csi-presence-detection/2.0 (Zenodo Dataset Fetcher)"},
+    )
+    md5_hasher = hashlib.md5()
+    downloaded_bytes = 0
+    chunk_size = 1024 * 256  # 256 KB
+
+    with urllib.request.urlopen(req, timeout=120) as response, open(archive_path, "wb") as out_file:
+        total_header = response.headers.get("Content-Length")
+        total_bytes = int(total_header) if total_header and total_header.isdigit() else 0
+
+        while True:
+            chunk = response.read(chunk_size)
+            if not chunk:
+                break
+            out_file.write(chunk)
+            md5_hasher.update(chunk)
+            downloaded_bytes += len(chunk)
+
+            if total_bytes > 0 and sys.stdout.isatty():
+                pct = (downloaded_bytes / total_bytes) * 100.0
+                mb_done = downloaded_bytes / (1024 * 1024)
+                mb_total = total_bytes / (1024 * 1024)
+                print(
+                    f"\r  Progress: {mb_done:6.1f} / {mb_total:6.1f} MB ({pct:5.1f}%)",
+                    end="",
+                    flush=True,
+                )
+
+    if sys.stdout.isatty():
+        print()
+
+    actual_md5 = md5_hasher.hexdigest()
+    print(f"\n[SUCCESS] Download complete ({downloaded_bytes / (1024 * 1024):.1f} MB).")
+    print(f"  MD5 Checksum: {actual_md5}")
+    if expected_md5 and archive_path.name == ZENODO_DEFAULT_ARCHIVE_NAME:
+        if actual_md5.lower() == expected_md5.lower():
+            print("  ✓ [OK] MD5 checksum matches official Zenodo v2.0.0 release.")
+        else:
+            print(
+                f"  ! [NOTE] MD5 differs from v2.0.0 reference ({expected_md5}); "
+                "ZIP CRC-32 integrity will be verified during extraction."
+            )
+    print("=" * 65)
+    return archive_path
+
+
+def fetch(
+    url: str = ZENODO_DEFAULT_URL,
+    archive_name: str | Path | None = None,
+    output_dir: str | Path = "outputs/backups",
+    repo_root: str | Path | None = None,
+) -> tuple[bool, Path]:
+    """Download the official Zenodo dataset archive and restore it in a single step."""
+    downloaded_path = download(
+        url=url,
+        archive_name=archive_name,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
+    return decompress(
+        archive_name=downloaded_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+        zenodo=True,
+    )
+
+
+def clean_caches(repo_root: str | Path | None = None) -> int:
+    """Remove Python bytecode caches and transient build artifacts across all platforms."""
+    _configure_console_utf8()
+    root = _find_repo_root(Path(repo_root) if repo_root else None)
+    removed_count = 0
+
+    for dir_name in ("build", "dist", ".pytest_cache", ".ruff_cache", ".mypy_cache"):
+        target = root / dir_name
+        if target.exists():
+            shutil.rmtree(target, ignore_errors=True)
+            removed_count += 1
+
+    for egg_dir in list(root.glob("*.egg-info")) + list((root / "src").glob("*.egg-info")):
+        if egg_dir.is_dir():
+            shutil.rmtree(egg_dir, ignore_errors=True)
+            removed_count += 1
+
+    for pycache in root.rglob("__pycache__"):
+        if ".venv" not in pycache.parts and "venv" not in pycache.parts:
+            shutil.rmtree(pycache, ignore_errors=True)
+            removed_count += 1
+
+    for ext in ("*.pyc", "*.pyo"):
+        for pyc_file in root.rglob(ext):
+            if ".venv" not in pyc_file.parts and "venv" not in pyc_file.parts:
+                try:
+                    pyc_file.unlink()
+                    removed_count += 1
+                except OSError:
+                    pass
+
+    print(f"[CLEAN] Removed {removed_count} cache/build directories and bytecode files.")
+    return removed_count
+
+
 def main() -> None:
     """CLI entrypoint supporting both subcommand and option flag invocations."""
+    _configure_console_utf8()
     parser = argparse.ArgumentParser(
-        description="Backup and restore Wi-Fi CSI project data using the Zenodo dataset standard."
+        description="Backup, download, and restore Wi-Fi CSI project data using the Zenodo dataset standard."
     )
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
 
@@ -488,9 +672,44 @@ def main() -> None:
         help="Validate restored archive against Zenodo academic dataset scope",
     )
 
+    # Command: download
+    parser_dl = subparsers.add_parser("download", help="Download official dataset archive from Zenodo")
+    parser_dl.add_argument(
+        "-f", "--file", dest="filename", type=str, default=None,
+        help=f"Target archive filename (default: '{ZENODO_DEFAULT_ARCHIVE_NAME}')",
+    )
+    parser_dl.add_argument(
+        "-d", "--dir", "--output-dir", dest="output_dir", type=str, default="outputs/backups",
+        help="Directory where archive will be saved (default: 'outputs/backups')",
+    )
+    parser_dl.add_argument(
+        "--url", dest="url", type=str, default=ZENODO_DEFAULT_URL,
+        help="Zenodo download URL",
+    )
+
+    # Command: fetch (download + restore)
+    parser_fetch = subparsers.add_parser("fetch", help="Download and restore Zenodo dataset in one step")
+    parser_fetch.add_argument(
+        "-f", "--file", dest="filename", type=str, default=None,
+        help=f"Target archive filename (default: '{ZENODO_DEFAULT_ARCHIVE_NAME}')",
+    )
+    parser_fetch.add_argument(
+        "-d", "--dir", "--output-dir", dest="output_dir", type=str, default="outputs/backups",
+        help="Directory where archive will be saved (default: 'outputs/backups')",
+    )
+    parser_fetch.add_argument(
+        "--url", dest="url", type=str, default=ZENODO_DEFAULT_URL,
+        help="Zenodo download URL",
+    )
+
+    # Command: clean
+    subparsers.add_parser("clean", help="Clean Python bytecode caches and transient build files")
+
     # Support top-level flags as fallback
     parser.add_argument("-c", "--compress", action="store_true", help="Compress data files (Zenodo format)")
     parser.add_argument("-x", "-r", "--decompress", "--restore", dest="do_restore", action="store_true", help="Restore data files (Zenodo format)")
+    parser.add_argument("--download", dest="do_download", action="store_true", help="Download Zenodo dataset archive")
+    parser.add_argument("--fetch", dest="do_fetch", action="store_true", help="Download and restore Zenodo dataset")
     parser.add_argument("-f", "--file", dest="flag_file", type=str, default=None, help="Archive filename")
     parser.add_argument("-d", "--dir", dest="flag_dir", type=str, default="outputs/backups", help="Output directory")
     parser.add_argument(
@@ -506,6 +725,10 @@ def main() -> None:
             command = "compress"
         elif args.do_restore:
             command = "decompress"
+        elif args.do_download:
+            command = "download"
+        elif args.do_fetch:
+            command = "fetch"
 
     if command == "compress":
         fname = getattr(args, "filename", None) or args.flag_file
@@ -517,6 +740,20 @@ def main() -> None:
         ok, _ = decompress(archive_name=fname, output_dir=odir, zenodo=True)
         if not ok:
             sys.exit(1)
+    elif command == "download":
+        fname = getattr(args, "filename", None) or args.flag_file
+        odir = getattr(args, "output_dir", None) or args.flag_dir
+        url = getattr(args, "url", ZENODO_DEFAULT_URL)
+        download(url=url, archive_name=fname, output_dir=odir)
+    elif command == "fetch":
+        fname = getattr(args, "filename", None) or args.flag_file
+        odir = getattr(args, "output_dir", None) or args.flag_dir
+        url = getattr(args, "url", ZENODO_DEFAULT_URL)
+        ok, _ = fetch(url=url, archive_name=fname, output_dir=odir)
+        if not ok:
+            sys.exit(1)
+    elif command == "clean":
+        clean_caches()
     else:
         parser.print_help()
         sys.exit(0)
