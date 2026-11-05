@@ -1,8 +1,8 @@
 # Wi-Fi CSI Presence Detection
 
-> Binary classification of human presence (`empty` vs. `occupied`) using Wi-Fi Channel State Information (CSI) collected from low-cost ESP32-S3 hardware — no cameras, no wearables.
+> Binary classification of human presence (`empty` vs. `occupied`) using Wi-Fi Channel State Information (CSI) collected from low-cost ESP32-S3 hardware, no cameras, no wearables.
 
-*Undergraduate Thesis (PFC) — Engenharia de Controle e Automação, UFMG, 2026.*
+*Undergraduate Thesis (PFC), Engenharia de Controle e Automação, UFMG, 2026.*
 
 ---
 
@@ -39,7 +39,7 @@ The project is structured to support **Linux**, **macOS** (Intel & Apple Silicon
 
 Follow the steps below in order to clone the project, configure the Python environment, download the dataset, verify the setup, and execute the Jupyter Notebooks.
 
-### Step 1 — Prerequisites & Clone
+### Step 1: Prerequisites & Clone
 
 Ensure **[`uv`](https://docs.astral.sh/uv/)** is installed on your system (`uv` automatically manages Python `>= 3.10` and virtual environments):
 
@@ -59,7 +59,7 @@ cd wifi-csi-presence-detection
 
 ---
 
-### Step 2 — Configure the Environment & Install Dependencies
+### Step 2: Configure the Environment & Install Dependencies
 
 Create the local `.venv` virtual environment and install the `wifi_csi` package (in editable mode) along with all scientific, machine learning, testing, and Jupyter Notebook dependencies:
 
@@ -80,7 +80,7 @@ Create the local `.venv` virtual environment and install the `wifi_csi` package 
 
 ---
 
-### Step 3 — Obtain the Dataset & Trained Models (Zenodo)
+### Step 3: Obtain the Dataset & Trained Models (Zenodo)
 
 Raw CSI session recordings (`data/01_raw/`), processed canonical feature tables and train/val/test splits (`data/03_processed/`), and trained model bundles (`models/`) are hosted on **Zenodo** ([DOI: 10.5281/zenodo.23960575](https://doi.org/10.5281/zenodo.23960575)).
 
@@ -103,7 +103,7 @@ Download, verify checksums, and restore all dataset and model files into their c
 
 ---
 
-### Step 4 — Verify the Installation (Automated Tests)
+### Step 4: Verify the Installation (Automated Tests)
 
 Run the automated `pytest` suite to confirm that all I/Q parsers, signal filters, feature extractors, model bundles, and Zenodo dataset paths are working properly:
 
@@ -122,7 +122,7 @@ Run the automated `pytest` suite to confirm that all I/Q parsers, signal filters
 
 ---
 
-### Step 5 — Execute the Jupyter Notebooks
+### Step 5: Execute the Jupyter Notebooks
 
 Launch JupyterLab directly inside the configured project environment:
 
@@ -155,7 +155,7 @@ Launch JupyterLab directly inside the configured project environment:
 
 ---
 
-### Step 6 — Real-Time Live Presence Detection (Optional Hardware)
+### Step 6: Real-Time Live Presence Detection (Optional Hardware)
 
 If you have the ESP32-S3 RX node connected over USB-serial (`921600` bps), launch the interactive real-time terminal monitor:
 
@@ -252,9 +252,9 @@ All in-depth documentation, mathematical formulations, and experimental reports 
 * **[Academic References (`docs/REFERENCES.md`)](docs/REFERENCES.md):** Complete bibliography and BibTeX entries supporting the thesis.
 
 ### Stage-by-Stage Notebook Reports (`docs/notebooks/`)
-* [`00_acquisition.md`](docs/notebooks/00_acquisition.md) — Hardware setup, collection protocol, and Schema v2.0 metadata.
-* [`01_eda.md`](docs/notebooks/01_eda.md) — Exploratory data analysis across `first_test`, `pilot`, and `main` campaigns.
-* [`02_pipeline.md`](docs/notebooks/02_pipeline.md) — Shared 162-subcarrier masking and 648-feature extraction (`pipeline_v0` & `pipeline_v1`).
-* [`03_analysis.md`](docs/notebooks/03_analysis.md) — PCA/LDA separability, hypothesis tests, and physical signal dynamics.
-* [`04_modeling.md`](docs/notebooks/04_modeling.md) — Stratified splitting, 10-fold CV tuning, hold-out evaluation, robustness, and feature minimization.
-* [`05_generalization.md`](docs/notebooks/05_generalization.md) — Out-of-distribution generalization across unseen environments and 2.0–5.0 m distances.
+* [`00_acquisition.md`](docs/notebooks/00_acquisition.md) Hardware setup, collection protocol, and Schema v2.0 metadata.
+* [`01_eda.md`](docs/notebooks/01_eda.md) Exploratory data analysis across `first_test`, `pilot`, and `main` campaigns.
+* [`02_pipeline.md`](docs/notebooks/02_pipeline.md) Shared 162-subcarrier masking and 648-feature extraction (`pipeline_v0` & `pipeline_v1`).
+* [`03_analysis.md`](docs/notebooks/03_analysis.md) PCA/LDA separability, hypothesis tests, and physical signal dynamics.
+* [`04_modeling.md`](docs/notebooks/04_modeling.md) Stratified splitting, 10-fold CV tuning, hold-out evaluation, robustness, and feature minimization.
+* [`05_generalization.md`](docs/notebooks/05_generalization.md) Out-of-distribution generalization across unseen environments and 2.0–5.0 m distances.
